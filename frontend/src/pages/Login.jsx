@@ -35,7 +35,7 @@ const Login = () => {
         {/* Logo */}
         <Link to="/" className="flex items-center justify-center space-x-3 mb-8">
           <Shield className="w-12 h-12 text-cyan-400" />
-          <span className="text-3xl font-bold text-white">AISEE</span>
+          <span className="text-3xl font-bold text-white">AICEE</span>
         </Link>
 
         {/* Login Card */}

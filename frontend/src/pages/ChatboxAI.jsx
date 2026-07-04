@@ -8,7 +8,7 @@ const ChatboxAI = () => {
     {
       id: 1,
       type: 'ai',
-      text: 'Xin chào! Tôi là trợ lý AI của AISEE. Tôi có thể giúp bạn kiểm tra độ an toàn của các trang web, email, số điện thoại và tư vấn về an ninh mạng. Bạn cần giúp gì?',
+      text: 'Xin chào! Tôi là trợ lý AI của AICEE. Tôi có thể giúp bạn kiểm tra độ an toàn của các trang web, email, số điện thoại và tư vấn về an ninh mạng. Bạn cần giúp gì?',
       timestamp: new Date(),
     },
   ]);
@@ -173,7 +173,7 @@ const ChatboxAI = () => {
               <div className="flex items-center space-x-3">
                 <Shield className="w-8 h-8 text-cyan-400" />
                 <div>
-                  <h1 className="text-xl font-bold text-white">AISEE AI Assistant</h1>
+                  <h1 className="text-xl font-bold text-white">AICEE AI Assistant</h1>
                   <p className="text-xs text-gray-400">Trợ lý ảo thông minh</p>
                 </div>
               </div>

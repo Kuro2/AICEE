@@ -25,7 +25,7 @@ const Header = () => {
               <Shield className="w-10 h-10 text-cyan-400 group-hover:text-cyan-300 transition-colors" />
               <div className="absolute inset-0 bg-cyan-400/20 blur-xl group-hover:bg-cyan-300/30 transition-all"></div>
             </div>
-            <span className="text-2xl font-bold text-white tracking-wider">AISEE</span>
+            <span className="text-2xl font-bold text-white tracking-wider">AICEE</span>
           </Link>
 
           {/* Desktop Navigation */}

@@ -78,7 +78,7 @@ const Home = () => {
               </h1>
 
               <p className="text-xl text-gray-300">
-                Để AISEE bảo vệ bạn khỏi các mối đe dọa trực tuyến, lừa đảo và phần mềm độc hại.
+                Để AICEE bảo vệ bạn khỏi các mối đe dọa trực tuyến, lừa đảo và phần mềm độc hại.
               </p>
 
               {/* CTA Buttons */}
