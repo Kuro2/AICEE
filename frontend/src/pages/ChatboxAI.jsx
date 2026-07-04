@@ -171,7 +171,11 @@ const ChatboxAI = () => {
               </button>
               
               <div className="flex items-center space-x-3">
-                <Shield className="w-8 h-8 text-cyan-400" />
+                <img 
+                  src="/logo-aicee.png" 
+                  alt="AICEE Logo" 
+                  className="w-8 h-8 object-contain"
+                />
                 <div>
                   <h1 className="text-xl font-bold text-white">AICEE AI Assistant</h1>
                   <p className="text-xs text-gray-400">Trợ lý ảo thông minh</p>

@@ -22,8 +22,11 @@ const Header = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-3 group">
             <div className="relative">
-              <Shield className="w-10 h-10 text-cyan-400 group-hover:text-cyan-300 transition-colors" />
-              <div className="absolute inset-0 bg-cyan-400/20 blur-xl group-hover:bg-cyan-300/30 transition-all"></div>
+              <img 
+                src="/logo-aicee.png" 
+                alt="AICEE Logo" 
+                className="w-10 h-10 object-contain group-hover:scale-105 transition-transform"
+              />
             </div>
             <span className="text-2xl font-bold text-white tracking-wider">AICEE</span>
           </Link>
