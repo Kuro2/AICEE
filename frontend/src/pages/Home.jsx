@@ -117,7 +117,8 @@ const Home = () => {
                       <img 
                         src="/logo-aicee.png" 
                         alt="AICEE Logo" 
-                        className="w-52 h-52 object-contain relative z-10"
+                        className="relative z-10 object-contain"
+                        style={{width: '624px', height: '624px'}}
                       />
                     </div>
                   </div>

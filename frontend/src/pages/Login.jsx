@@ -37,7 +37,8 @@ const Login = () => {
           <img 
             src="/logo-aicee.png" 
             alt="AICEE Logo" 
-            className="w-28 h-28 object-contain"
+            className="w-84 h-84 object-contain"
+            style={{width: '336px', height: '336px'}}
           />
           <span className="text-3xl font-bold text-white">AICEE</span>
         </Link>
