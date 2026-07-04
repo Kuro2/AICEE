@@ -15,10 +15,6 @@ const Footer = () => {
             <p className="text-gray-400 mb-4">
               AICEE có cơ sở trên cửa hàng tiện ích mở rộng của các trình duyệt sau: Microsoft Edge, Chrome, Cốc Cốc, Brave và FireFox.
             </p>
-            <div className="text-gray-500 text-sm space-y-1">
-              <p>Công ty TNHH Doanh Nghiệp Về Hỗ Chống Lừa Đảo</p>
-              <p>Mã Số thuế: 0317048919</p>
-            </div>
           </div>
 
           {/* Mạng xã hội */}
