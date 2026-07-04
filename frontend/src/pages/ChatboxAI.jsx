@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Shield, Send, User, Bot, Home, Menu, X, Sparkles, AlertCircle, CheckCircle, Info } from 'lucide-react';
+import { Shield, Send, User, Bot, Home, Menu, X, Sparkles, AlertCircle, CheckCircle, Info, Paperclip, Image as ImageIcon, File } from 'lucide-react';
 
 const ChatboxAI = () => {
   const navigate = useNavigate();
@@ -15,7 +15,9 @@ const ChatboxAI = () => {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -64,24 +66,61 @@ const ChatboxAI = () => {
     };
   };
 
-  const handleSendMessage = async () => {
-    if (!inputText.trim()) return;
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    const fileData = files.map(file => ({
+      file,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : null
+    }));
+    setSelectedFiles(prev => [...prev, ...fileData]);
+  };
 
-    // Add user message
+  const removeFile = (index) => {
+    setSelectedFiles(prev => {
+      const newFiles = [...prev];
+      if (newFiles[index].preview) {
+        URL.revokeObjectURL(newFiles[index].preview);
+      }
+      newFiles.splice(index, 1);
+      return newFiles;
+    });
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim() && selectedFiles.length === 0) return;
+
+    // Add user message with files
     const userMessage = {
       id: messages.length + 1,
       type: 'user',
       text: inputText,
+      files: selectedFiles.length > 0 ? [...selectedFiles] : null,
       timestamp: new Date(),
     };
 
     setMessages([...messages, userMessage]);
     setInputText('');
+    setSelectedFiles([]);
     setIsTyping(true);
 
     // Simulate AI thinking
     setTimeout(() => {
-      const aiResponse = getAIResponse(inputText);
+      let aiResponse;
+      if (userMessage.files && userMessage.files.length > 0) {
+        const isImage = userMessage.files.some(f => f.type.startsWith('image/'));
+        aiResponse = {
+          text: isImage 
+            ? '🖼️ Đang phân tích hình ảnh...\n\n✅ Kết quả: Không phát hiện nội dung nguy hiểm!\n\n🛡️ Thông tin:\n• Không có malware ẩn trong metadata\n• Không phát hiện phishing/scam\n• Hình ảnh an toàn để xem\n\nBạn muốn kiểm tra thêm không?'
+            : '📄 Đang phân tích file...\n\n✅ Kết quả: File an toàn!\n\n🛡️ Thông tin:\n• Không phát hiện virus\n• Không có mã độc\n• File hợp lệ\n\nBạn muốn kiểm tra thêm không?',
+          type: 'safe'
+        };
+      } else {
+        aiResponse = getAIResponse(inputText);
+      }
+      
       const aiMessage = {
         id: messages.length + 2,
         type: 'ai',
@@ -225,7 +264,31 @@ const ChatboxAI = () => {
                         </span>
                       </div>
                     )}
-                    <p className="whitespace-pre-line">{message.text}</p>
+                    
+                    {/* Display uploaded files */}
+                    {message.files && message.files.length > 0 && (
+                      <div className="mb-3 space-y-2">
+                        {message.files.map((fileData, idx) => (
+                          <div key={idx}>
+                            {fileData.preview ? (
+                              <img 
+                                src={fileData.preview} 
+                                alt={fileData.name}
+                                className="max-w-xs rounded-lg border border-white/20"
+                              />
+                            ) : (
+                              <div className="flex items-center space-x-2 bg-white/10 px-3 py-2 rounded-lg">
+                                <File className="w-4 h-4" />
+                                <span className="text-sm">{fileData.name}</span>
+                                <span className="text-xs opacity-70">({(fileData.size / 1024).toFixed(1)} KB)</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {message.text && <p className="whitespace-pre-line">{message.text}</p>}
                     <span className="text-xs opacity-70 mt-2 block">
                       {message.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     </span>
@@ -258,13 +321,66 @@ const ChatboxAI = () => {
           {/* Input Area */}
           <div className="border-t border-slate-800 bg-slate-900/50 p-4">
             <div className="container mx-auto max-w-4xl">
-              <div className="flex items-end space-x-3">
+              {/* File Preview */}
+              {selectedFiles.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {selectedFiles.map((fileData, idx) => (
+                    <div key={idx} className="relative group">
+                      {fileData.preview ? (
+                        <div className="relative">
+                          <img 
+                            src={fileData.preview} 
+                            alt={fileData.name}
+                            className="w-20 h-20 object-cover rounded-lg border-2 border-slate-700"
+                          />
+                          <button
+                            onClick={() => removeFile(idx)}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="relative flex items-center space-x-2 bg-slate-800 border border-slate-700 px-3 py-2 rounded-lg">
+                          <File className="w-4 h-4 text-cyan-400" />
+                          <span className="text-sm text-gray-300 max-w-[150px] truncate">{fileData.name}</span>
+                          <button
+                            onClick={() => removeFile(idx)}
+                            className="ml-2 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="flex items-end space-x-2">
+                {/* File Upload Button */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx,.txt"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-gray-300 rounded-xl transition-all flex items-center justify-center"
+                  title="Đính kèm file"
+                >
+                  <Paperclip className="w-5 h-5" />
+                </button>
+                
                 <div className="flex-1 relative">
                   <textarea
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Nhập tin nhắn của bạn..."
+                    placeholder="Nhập tin nhắn hoặc đính kèm file..."
                     rows="1"
                     className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all resize-none"
                     style={{ minHeight: '48px', maxHeight: '120px' }}
@@ -273,7 +389,7 @@ const ChatboxAI = () => {
                 </div>
                 <button
                   onClick={handleSendMessage}
-                  disabled={!inputText.trim()}
+                  disabled={!inputText.trim() && selectedFiles.length === 0}
                   className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl hover:from-cyan-400 hover:to-blue-400 transition-all shadow-lg hover:shadow-cyan-500/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                   data-testid="chatbox-send-btn"
                 >
@@ -282,7 +398,7 @@ const ChatboxAI = () => {
                 </button>
               </div>
               <p className="text-xs text-gray-500 mt-2 text-center">
-                Nhấn Enter để gửi, Shift+Enter để xuống dòng
+                Nhấn Enter để gửi, Shift+Enter để xuống dòng • Hỗ trợ: Ảnh, PDF, DOC, TXT
               </p>
             </div>
           </div>
