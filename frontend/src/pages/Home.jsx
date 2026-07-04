@@ -117,7 +117,7 @@ const Home = () => {
                       <img 
                         src="/logo-aicee.png" 
                         alt="AICEE Logo" 
-                        className="w-40 h-40 object-contain relative z-10"
+                        className="w-52 h-52 object-contain relative z-10"
                       />
                     </div>
                   </div>

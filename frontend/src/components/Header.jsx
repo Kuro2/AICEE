@@ -25,7 +25,7 @@ const Header = () => {
               <img 
                 src="/logo-aicee.png" 
                 alt="AICEE Logo" 
-                className="w-16 h-16 object-contain group-hover:scale-105 transition-transform"
+                className="w-20 h-20 object-contain group-hover:scale-105 transition-transform"
               />
             </div>
             <span className="text-2xl font-bold text-white tracking-wider">AICEE</span>
