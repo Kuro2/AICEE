@@ -110,11 +110,15 @@ const Home = () => {
                   <div className="absolute inset-0 rounded-full border-4 border-cyan-500/30 animate-spin-slow"></div>
                   <div className="absolute inset-4 rounded-full border-4 border-blue-500/30 animate-spin-slow-reverse"></div>
                   
-                  {/* Center Shield */}
+                  {/* Center Logo */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="relative">
                       <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 blur-2xl"></div>
-                      <Shield className="w-40 h-40 text-cyan-400 relative z-10" strokeWidth={1.5} />
+                      <img 
+                        src="/logo-aicee.png" 
+                        alt="AICEE Logo" 
+                        className="w-40 h-40 object-contain relative z-10"
+                      />
                     </div>
                   </div>
                   

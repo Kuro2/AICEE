@@ -12,7 +12,7 @@ const Footer = () => {
               <img 
                 src="/logo-aicee.png" 
                 alt="AICEE Logo" 
-                className="w-8 h-8 object-contain"
+                className="w-14 h-14 object-contain"
               />
               <span className="text-2xl font-bold text-white">AICEE</span>
             </div>
