@@ -99,21 +99,6 @@ const Home = () => {
                   Tìm hiểu thêm
                 </button>
               </div>
-
-              {/* Quick Actions */}
-              <div className="flex flex-wrap gap-3 pt-4">
-                <span className="text-gray-400 text-sm">Kiểm tra nhanh:</span>
-                <button className="px-4 py-2 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-lg text-gray-300 text-sm transition-all flex items-center space-x-2">
-                  <Globe className="w-4 h-4" />
-                  <span>Liên kết</span>
-                </button>
-                <button className="px-4 py-2 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-lg text-gray-300 text-sm transition-all">
-                  📱 SĐT
-                </button>
-                <button className="px-4 py-2 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-lg text-gray-300 text-sm transition-all">
-                  📧 Email
-                </button>
-              </div>
             </div>
 
             {/* Right - Illustration */}
