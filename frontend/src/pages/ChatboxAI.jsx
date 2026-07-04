@@ -174,7 +174,7 @@ const ChatboxAI = () => {
                 <img 
                   src="/logo-aicee.png" 
                   alt="AICEE Logo" 
-                  className="w-48 h-48 object-contain"
+                  className="w-24 h-24 object-contain"
                 />
                 <div>
                   <h1 className="text-xl font-bold text-white">AICEE AI Assistant</h1>
