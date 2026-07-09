@@ -8,7 +8,7 @@ const Header = () => {
   const location = useLocation();
 
   const menuItems = [
-    { name: 'Tin tức', path: '#' },
+    { name: 'Tin tức', path: '/news' },
     { name: 'Tài nguyên', path: '#' },
     { name: 'Bảng xếp hạng', path: '#' },
     { name: 'Truyền thông', path: '#' },
@@ -34,13 +34,13 @@ const Header = () => {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             {menuItems.map((item, index) => (
-              <a
+              <Link
                 key={index}
-                href={item.path}
+                to={item.path}
                 className="text-gray-300 hover:text-cyan-400 transition-colors font-medium"
               >
                 {item.name}
-              </a>
+              </Link>
             ))}
           </nav>
 
@@ -76,13 +76,13 @@ const Header = () => {
         {isMenuOpen && (
           <div className="md:hidden mt-4 pb-4 space-y-3">
             {menuItems.map((item, index) => (
-              <a
+              <Link
                 key={index}
-                href={item.path}
+                to={item.path}
                 className="block text-gray-300 hover:text-cyan-400 transition-colors py-2"
               >
                 {item.name}
-              </a>
+              </Link>
             ))}
             <button 
               onClick={() => navigate('/chatbox')}
