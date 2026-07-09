@@ -4,15 +4,28 @@ import { Shield, Menu, X } from 'lucide-react';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [user, setUser] = React.useState(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  React.useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    navigate('/login');
+  };
 
   const menuItems = [
     { name: 'Tin tức', path: '/news' },
     { name: 'Tài nguyên', path: '#' },
     { name: 'Bảng xếp hạng', path: '#' },
     { name: 'Truyền thông', path: '#' },
-    { name: 'Đối tác', path: '#' },
   ];
 
   return (
@@ -55,12 +68,26 @@ const Header = () => {
             >
               AI Tư vấn
             </button>
-            <button 
-              onClick={() => navigate('/login')}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-medium"
-            >
-              Đăng nhập
-            </button>
+            {user ? (
+              <div className="flex items-center space-x-4">
+                <div className="w-10 h-10 rounded-full bg-cyan-500 flex items-center justify-center text-white font-bold shadow-lg shadow-cyan-500/20">
+                  {user.email[0].toUpperCase()}
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  className="px-4 py-2 text-gray-300 hover:text-red-400 transition-colors font-medium border border-transparent hover:border-red-500/30 rounded-lg"
+                >
+                  Đăng xuất
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => navigate('/login')}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-medium"
+              >
+                Đăng nhập
+              </button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -90,12 +117,21 @@ const Header = () => {
             >
               AI Tư vấn
             </button>
-            <button 
-              onClick={() => navigate('/login')}
-              className="w-full px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
-            >
-              Đăng nhập
-            </button>
+            {user ? (
+              <button 
+                onClick={handleLogout}
+                className="w-full px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+              >
+                Đăng xuất ({user.email})
+              </button>
+            ) : (
+              <button 
+                onClick={() => navigate('/login')}
+                className="w-full px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+              >
+                Đăng nhập
+              </button>
+            )}
           </div>
         )}
       </div>

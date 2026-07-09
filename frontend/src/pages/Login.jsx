@@ -12,8 +12,10 @@ const Login = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Mock login - just navigate to chatbox
-    navigate('/chatbox');
+    if (formData.email) {
+      localStorage.setItem('user', JSON.stringify({ email: formData.email }));
+      navigate('/');
+    }
   };
 
   const handleChange = (e) => {
