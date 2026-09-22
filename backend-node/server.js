@@ -134,10 +134,8 @@ app.use((err, req, res, next) => {
 // ===== START SERVER / EXPORT FOR NETLIFY =====
 // Nếu có MONGODB_URI thì kết nối, nếu không thì cảnh báo
 if (process.env.MONGODB_URI) {
-  mongoose.connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  }).then(() => console.log('✅ MongoDB Connected'))
+  mongoose.connect(process.env.MONGODB_URI)
+    .then(() => console.log('✅ MongoDB Connected'))
     .catch(err => console.error('❌ MongoDB Connection Error:', err));
 } else {
   console.log('⚠️  Chưa cấu hình MONGODB_URI. Server sẽ chạy nhưng không lưu được dữ liệu!');
