@@ -20,12 +20,13 @@ Quy tắc trả lời:
 - Đưa ra khuyến nghị cụ thể
 - Nếu không chắc chắn, hãy nói rõ và khuyên người dùng thận trọng
 
-Format trả lời (JSON):
-{
-  "text": "Nội dung phản hồi...",
-  "status": "safe|warning|danger|info",
-  "recommendations": ["Khuyến nghị 1", "Khuyến nghị 2"]
-}`;
+Cách trả lời:
+- Luôn dùng tiếng Việt tự nhiên, thân thiện
+- Dùng emoji để làm nổi bật kết quả
+- BẮT ĐẦU câu trả lời với một trong: "✅ AN TOÀN", "⚠️ CẢNH BÁO", "❌ NGUY HIỂM", "ℹ️ THÔNG TIN" tùy theo đánh giá
+- Giải thích rõ lý do
+- Đưa ra khuyến nghị cụ thể
+- Tuyệt đối KHÔNG trả lời dưới dạng JSON hay code block`;
 
 // Logic phân tích heuristic (không cần AI)
 function analyzeWithHeuristic(message) {
@@ -163,53 +164,58 @@ async function sendToGemini(message, history = []) {
 
   try {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
 
-    // Tạo chat session
-    const chat = model.startChat({
-      history: history.map(h => ({
-        role: h.role,
+    // Tạo chat session với lịch sử hợp lệ
+    const validHistory = history
+      .filter(h => h.content && h.content.trim())
+      .map(h => ({
+        role: h.role === 'model' ? 'model' : 'user',
         parts: [{ text: h.content }]
-      })),
+      }));
+
+    const chat = model.startChat({
+      history: validHistory,
       generationConfig: {
-        maxOutputTokens: 1000,
-        temperature: 0.7,
+        maxOutputTokens: 800,
+        temperature: 0.6,
       }
     });
 
-    const fullPrompt = `${SYSTEM_PROMPT}\n\nNgười dùng hỏi: ${message}\n\nTrả lời theo định dạng JSON:`;
+    const fullPrompt = `${SYSTEM_PROMPT}\n\nNgười dùng: ${message}`;
     const result = await chat.sendMessage(fullPrompt);
-    const responseText = result.response.text();
+    let responseText = result.response.text().trim();
 
-    // Cố gắng parse JSON từ response
+    // Strip markdown code blocks nếu có (```json ... ``` hoặc ``` ... ```)
+    responseText = responseText
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/i, '')
+      .trim();
+
+    // Nếu AI vẫn trả về JSON wrapper, lấy trường text bên trong
     try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          text: parsed.text || responseText,
-          status: parsed.status || 'info',
-          recommendations: parsed.recommendations || []
-        };
+      if (responseText.startsWith('{')) {
+        const parsed = JSON.parse(responseText);
+        if (parsed.text) responseText = parsed.text;
       }
     } catch (e) {
-      // Nếu không parse được JSON, trả về text thuần
+      // Không phải JSON, giữ nguyên
     }
 
-    // Xác định status dựa trên nội dung
+    // Phát hiện status từ keywords tiếng Việt
+    const lower = responseText.toLowerCase();
     let status = 'info';
-    if (responseText.toLowerCase().includes('nguy hiểm') || responseText.toLowerCase().includes('danger')) {
-      status = 'danger';
-    } else if (responseText.toLowerCase().includes('cảnh báo') || responseText.toLowerCase().includes('warning')) {
-      status = 'warning';
-    } else if (responseText.toLowerCase().includes('an toàn') || responseText.toLowerCase().includes('safe')) {
-      status = 'safe';
-    }
+    const dangerWords = ['nguy hiểm', 'lừa đảo', 'giả mạo', 'phishing', 'scam', 'độc hại', 'không nên truy cập', 'không an toàn'];
+    const warningWords = ['cảnh báo', 'cẩn thận', 'đáng ngờ', 'thận trọng', 'suspicious'];
+    const safeWords = ['an toàn', 'tin cậy', 'hợp lệ', 'không có vấn đề', 'uy tín', 'đáng tin'];
+
+    if (dangerWords.some(k => lower.includes(k))) status = 'danger';
+    else if (warningWords.some(k => lower.includes(k))) status = 'warning';
+    else if (safeWords.some(k => lower.includes(k))) status = 'safe';
 
     return { text: responseText, status, recommendations: [] };
   } catch (error) {
     console.error('Gemini API error:', error.message);
-    // Fallback về mock nếu có lỗi
     return getMockResponse(message);
   }
 }
