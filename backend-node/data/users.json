@@ -1,0 +1,12 @@
+[
+  {
+    "id": "4c63a390-4a91-4710-a7d5-98262447598f",
+    "email": "test@aicee.vn",
+    "password": "$2b$10$FvXe6bT2kCI7Q4yc/NUsv.1hpYAhYOgQtuUay3pj6rSzy1TuhdrIK",
+    "name": "Test User",
+    "role": "user",
+    "createdAt": "2026-09-22T04:37:34.711Z",
+    "lastLogin": null,
+    "avatar": null
+  }
+]

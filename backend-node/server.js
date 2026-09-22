@@ -1,24 +1,158 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// ===== SECURITY MIDDLEWARE =====
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
 
-// Routes
-app.get('/api/status', (req, res) => {
-  res.json({ status: 'ok', message: 'Backend Node.js is running' });
+// Rate limiting - chống spam requests
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 phút
+  max: 200, // Tối đa 200 request/15 phút
+  message: {
+    success: false,
+    message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use(limiter);
+
+// Rate limit nghiêm hơn cho AI chat
+const chatLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 phút
+  max: 30, // Tối đa 30 tin nhắn/phút
+  message: {
+    success: false,
+    message: 'Gửi tin nhắn quá nhanh. Vui lòng đợi một chút.'
+  }
 });
 
+// ===== CORS =====
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+// ===== BODY PARSER =====
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ===== REQUEST LOGGING =====
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
+
+// ===== IMPORT ROUTES =====
+const authRoutes = require('./routes/auth');
+const chatRoutes = require('./routes/chat');
+const scanRoutes = require('./routes/scan');
+const newsRoutes = require('./routes/news');
+const uploadRoutes = require('./routes/upload');
+
+// ===== MOUNT ROUTES =====
+app.use('/api/auth', authRoutes);
+app.use('/api/chat', chatLimiter, chatRoutes);
+app.use('/api/scan', scanRoutes);
+app.use('/api/news', newsRoutes);
+app.use('/api/upload', uploadRoutes);
+
+// ===== ROOT ENDPOINT =====
 app.get('/', (req, res) => {
-  res.send('AICEEE Node.js API is running');
+  res.json({
+    name: 'AICEE Backend API',
+    version: '1.0.0',
+    description: 'API bảo vệ an ninh mạng thông minh',
+    status: 'running',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      auth: '/api/auth',
+      chat: '/api/chat',
+      scan: '/api/scan',
+      news: '/api/news',
+      upload: '/api/upload',
+      health: '/api/health'
+    }
+  });
 });
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+// ===== HEALTH CHECK =====
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    status: 'healthy',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    geminiEnabled: !!process.env.GEMINI_API_KEY,
+    memory: {
+      used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
+      total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`
+    }
+  });
 });
+
+// ===== QUICK SCAN SHORTCUT =====
+app.get('/api/status', (req, res) => {
+  res.json({
+    success: true,
+    message: 'AICEE Backend Node.js đang hoạt động tốt',
+    version: '1.0.0'
+  });
+});
+
+// ===== 404 HANDLER =====
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Endpoint '${req.method} ${req.path}' không tồn tại`
+  });
+});
+
+// ===== GLOBAL ERROR HANDLER =====
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Lỗi server không xác định',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
+
+// ===== START SERVER =====
+app.listen(PORT, () => {
+  console.log('\n======================================');
+  console.log('  🛡️  AICEE Backend API Started!');
+  console.log('======================================');
+  console.log(`  🌐 URL:        http://localhost:${PORT}`);
+  console.log(`  🤖 AI:         ${process.env.GEMINI_API_KEY ? '✅ Gemini Connected' : '⚠️  Mock Mode (add GEMINI_API_KEY)'}`);
+  console.log(`  📡 CORS:       ${process.env.CORS_ORIGIN || '*'}`);
+  console.log('--------------------------------------');
+  console.log('  📌 Endpoints:');
+  console.log(`     POST  /api/auth/register`);
+  console.log(`     POST  /api/auth/login`);
+  console.log(`     GET   /api/auth/me`);
+  console.log(`     POST  /api/chat`);
+  console.log(`     POST  /api/scan/url`);
+  console.log(`     POST  /api/scan/email`);
+  console.log(`     POST  /api/scan/phone`);
+  console.log(`     POST  /api/scan/quick`);
+  console.log(`     GET   /api/news`);
+  console.log(`     GET   /api/news/:id`);
+  console.log(`     POST  /api/news/subscribe`);
+  console.log(`     POST  /api/upload`);
+  console.log(`     GET   /api/health`);
+  console.log('======================================\n');
+});
+
+module.exports = app;
