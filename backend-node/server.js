@@ -3,6 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
+const mongoose = require('mongoose');
+const serverless = require('serverless-http');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -129,8 +131,21 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ===== START SERVER =====
-app.listen(PORT, () => {
+// ===== START SERVER / EXPORT FOR NETLIFY =====
+// Nếu có MONGODB_URI thì kết nối, nếu không thì cảnh báo
+if (process.env.MONGODB_URI) {
+  mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  }).then(() => console.log('✅ MongoDB Connected'))
+    .catch(err => console.error('❌ MongoDB Connection Error:', err));
+} else {
+  console.log('⚠️  Chưa cấu hình MONGODB_URI. Server sẽ chạy nhưng không lưu được dữ liệu!');
+}
+
+// Chạy local hoặc deploy Render (Standalone server)
+if (process.env.NODE_ENV !== 'serverless') {
+  app.listen(PORT, () => {
   console.log('\n======================================');
   console.log('  🛡️  AICEE Backend API Started!');
   console.log('======================================');
@@ -151,8 +166,11 @@ app.listen(PORT, () => {
   console.log(`     GET   /api/news/:id`);
   console.log(`     POST  /api/news/subscribe`);
   console.log(`     POST  /api/upload`);
-  console.log(`     GET   /api/health`);
-  console.log('======================================\n');
-});
+    console.log(`     GET   /api/health`);
+    console.log('======================================\n');
+  });
+}
 
-module.exports = app;
+// Export cho Netlify Functions (Serverless)
+module.exports.handler = serverless(app);
+module.exports.app = app;

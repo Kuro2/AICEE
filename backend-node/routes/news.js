@@ -7,7 +7,7 @@ const { getAllNews, getNewsById, getCategories, searchNews, addSubscriber } = re
  * @desc    Lấy danh sách tin tức (có phân trang và lọc)
  * @access  Public
  */
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -16,7 +16,7 @@ router.get('/', (req, res) => {
 
     // Nếu có tìm kiếm
     if (search) {
-      const results = searchNews(search);
+      const results = await searchNews(search);
       return res.json({
         success: true,
         data: {
@@ -32,7 +32,7 @@ router.get('/', (req, res) => {
       });
     }
 
-    const result = getAllNews(page, limit, category);
+    const result = await getAllNews(page, limit, category);
 
     res.json({
       success: true,
@@ -52,9 +52,9 @@ router.get('/', (req, res) => {
  * @desc    Lấy danh sách categories
  * @access  Public
  */
-router.get('/categories', (req, res) => {
+router.get('/categories', async (req, res) => {
   try {
-    const categories = getCategories();
+    const categories = await getCategories();
     res.json({
       success: true,
       data: { categories }
@@ -72,9 +72,9 @@ router.get('/categories', (req, res) => {
  * @desc    Lấy chi tiết tin tức theo ID
  * @access  Public
  */
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const news = getNewsById(req.params.id);
+    const news = await getNewsById(req.params.id);
 
     if (!news) {
       return res.status(404).json({
@@ -101,7 +101,7 @@ router.get('/:id', (req, res) => {
  * @desc    Đăng ký nhận bản tin qua email
  * @access  Public
  */
-router.post('/subscribe', (req, res) => {
+router.post('/subscribe', async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -120,7 +120,7 @@ router.post('/subscribe', (req, res) => {
       });
     }
 
-    const isNew = addSubscriber(email);
+    const isNew = await addSubscriber(email);
 
     res.json({
       success: true,
