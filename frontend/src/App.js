@@ -6,6 +6,7 @@ import Home from '@/pages/Home';
 import Login from '@/pages/Login';
 import ChatboxAI from '@/pages/ChatboxAI';
 import News from '@/pages/News';
+import NewsDetail from '@/pages/NewsDetail';
 import Resources from '@/pages/Resources';
 import UnsafeList from '@/pages/UnsafeList';
 import SafeList from '@/pages/SafeList';
@@ -25,6 +26,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/news" element={<News />} />
+            <Route path="/news/:id" element={<NewsDetail />} />
             <Route path="/login" element={<Login />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/chatbox" element={<ChatboxAI />} />

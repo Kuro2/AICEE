@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Calendar, ArrowRight, BookOpen, Search, Loader, AlertCircle, Tag, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { newsAPI } from '@/services/api';
 
 const News = () => {
+  const navigate = useNavigate();
   const [newsItems, setNewsItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -15,7 +17,6 @@ const News = () => {
   const [subscribeEmail, setSubscribeEmail] = useState('');
   const [subscribeMsg, setSubscribeMsg] = useState(null);
   const [subscribeLoading, setSubscribeLoading] = useState(false);
-  const [selectedNews, setSelectedNews] = useState(null); // chi tiết bài đọc
 
   // Lấy tin tức từ API
   const fetchNews = async () => {
@@ -206,7 +207,7 @@ const News = () => {
               <article
                 key={news.id}
                 className="bg-slate-900/50 rounded-2xl overflow-hidden border border-slate-700/50 hover:border-cyan-500/50 transition-all group flex flex-col cursor-pointer"
-                onClick={() => setSelectedNews(news)}
+                onClick={() => navigate(`/news/${news.id}`)}
               >
                 <div className="relative h-56 overflow-hidden">
                   <img
@@ -270,45 +271,7 @@ const News = () => {
           </div>
         )}
 
-        {/* Article Modal */}
-        {selectedNews && (
-          <div
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setSelectedNews(null)}
-          >
-            <div
-              className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <img
-                src={selectedNews.image}
-                alt={selectedNews.title}
-                className="w-full h-56 object-cover rounded-t-2xl"
-                onError={(e) => {
-                  e.target.src = 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800&q=80';
-                }}
-              />
-              <div className="p-6">
-                <div className={`inline-block ${getCategoryColor(selectedNews.category)} text-white text-xs font-bold px-3 py-1 rounded-full mb-4`}>
-                  {selectedNews.category}
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-3">{selectedNews.title}</h2>
-                <div className="flex items-center text-gray-500 text-xs mb-4 space-x-3">
-                  <span>{selectedNews.date}</span>
-                  {selectedNews.author && <><span>•</span><span>{selectedNews.author}</span></>}
-                </div>
-                <p className="text-gray-300 leading-relaxed">{selectedNews.excerpt}</p>
-                <p className="text-gray-400 mt-4 leading-relaxed">{selectedNews.content}</p>
-                <button
-                  onClick={() => setSelectedNews(null)}
-                  className="mt-6 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-                >
-                  Đóng
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Đã gỡ Article Modal, chuyển sang trang riêng (NewsDetail) */}
 
         {/* Subscribe Section */}
         <div className="bg-gradient-to-r from-blue-900/40 to-cyan-900/40 border border-blue-500/30 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row items-center justify-between">
