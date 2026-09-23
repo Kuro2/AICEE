@@ -62,6 +62,30 @@ export const authAPI = {
   },
 
   /**
+   * Đăng nhập bằng Google
+   */
+  googleLogin: async (token) => {
+    const res = await request('POST', '/auth/google', { token });
+    if (res.success) {
+      localStorage.setItem('aicee_token', res.data.token);
+      localStorage.setItem('aicee_user', JSON.stringify(res.data.user));
+    }
+    return res;
+  },
+
+  /**
+   * Đăng nhập bằng Facebook
+   */
+  facebookLogin: async (accessToken) => {
+    const res = await request('POST', '/auth/facebook', { accessToken });
+    if (res.success) {
+      localStorage.setItem('aicee_token', res.data.token);
+      localStorage.setItem('aicee_user', JSON.stringify(res.data.user));
+    }
+    return res;
+  },
+
+  /**
    * Lấy thông tin user hiện tại
    */
   getMe: () => request('GET', '/auth/me'),
@@ -181,4 +205,20 @@ export const uploadAPI = {
 
 export const healthAPI = {
   check: () => request('GET', '/health'),
+};
+
+// ── Resource API ──────────────────────────────────────────
+
+export const resourceAPI = {
+  /**
+   * Lấy danh sách an toàn/không an toàn
+   * @param {boolean} isSafe - true cho danh sách an toàn, false cho danh sách không an toàn, bỏ trống để lấy tất cả
+   */
+  getResources: (isSafe) => {
+    let url = '/resources';
+    if (isSafe !== undefined) {
+      url += `?isSafe=${isSafe}`;
+    }
+    return request('GET', url);
+  }
 };

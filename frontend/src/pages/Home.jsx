@@ -94,6 +94,7 @@ const Home = () => {
                 </button>
 
                 <button
+                  onClick={() => navigate('/resources/how-it-works')}
                   className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all border border-slate-700 font-semibold text-lg"
                 >
                   Tìm hiểu thêm
@@ -252,24 +253,26 @@ const Home = () => {
               NGAY HÔM NAY
             </p>
 
-            <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-              <button
-                onClick={() => navigate('/chatbox')}
-                className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl hover:from-cyan-400 hover:to-blue-400 transition-all shadow-lg hover:shadow-cyan-500/50 font-semibold"
+            <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-4 max-w-4xl mx-auto">
+              <button 
+                onClick={() => window.open('https://nospam.vncert.vn', '_blank')}
+                className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all font-semibold shadow-lg"
               >
-                🛡️ Cài đặt tiện ích
-              </button>
-
-              <button className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all font-semibold">
                 🔒 Chống tin nhắn/cuộc gọi rác
               </button>
 
-              <button className="px-8 py-4 bg-yellow-600 hover:bg-yellow-500 text-white rounded-xl transition-all font-semibold">
-                🔍 Trác nghiệm thử/giả
+              <button 
+                onClick={() => navigate('/quiz/fake')}
+                className="px-8 py-4 bg-yellow-600 hover:bg-yellow-500 text-white rounded-xl transition-all font-semibold shadow-lg"
+              >
+                🔍 Trắc nghiệm thật/giả
               </button>
 
-              <button className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition-all font-semibold">
-                ⚠️ Trác nghiệm về Email lừa đảo
+              <button 
+                onClick={() => navigate('/quiz/email')}
+                className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition-all font-semibold shadow-lg"
+              >
+                ⚠️ Trắc nghiệm về Email lừa đảo
               </button>
             </div>
           </div>
@@ -282,28 +285,40 @@ const Home = () => {
           <h2 className="text-4xl font-bold text-center text-white mb-12">Xem Thêm</h2>
 
           <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            <div className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-slate-700 hover:border-cyan-500/50 transition-all cursor-pointer group">
+            <div 
+              onClick={() => navigate('/resources/info')}
+              className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-slate-700 hover:border-cyan-500/50 transition-all cursor-pointer group"
+            >
               <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-cyan-400 transition-colors">
                 Thông tin hữu ích
               </h3>
               <ArrowRight className="w-6 h-6 text-cyan-400 group-hover:translate-x-2 transition-transform" />
             </div>
 
-            <div className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-slate-700 hover:border-cyan-500/50 transition-all cursor-pointer group">
+            <div 
+              onClick={() => navigate('/resources/terms')}
+              className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-slate-700 hover:border-cyan-500/50 transition-all cursor-pointer group"
+            >
               <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-cyan-400 transition-colors">
                 Điều khoản sử dụng
               </h3>
               <ArrowRight className="w-6 h-6 text-cyan-400 group-hover:translate-x-2 transition-transform" />
             </div>
 
-            <div className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-slate-700 hover:border-cyan-500/50 transition-all cursor-pointer group">
+            <div 
+              onClick={() => navigate('/resources/privacy')}
+              className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-slate-700 hover:border-cyan-500/50 transition-all cursor-pointer group"
+            >
               <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-cyan-400 transition-colors">
                 Chính sách bảo mật
               </h3>
               <ArrowRight className="w-6 h-6 text-cyan-400 group-hover:translate-x-2 transition-transform" />
             </div>
 
-            <div className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-slate-700 hover:border-cyan-500/50 transition-all cursor-pointer group">
+            <div 
+              onClick={() => navigate('/resources')}
+              className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-slate-700 hover:border-cyan-500/50 transition-all cursor-pointer group"
+            >
               <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-cyan-400 transition-colors">
                 Xem thêm
               </h3>

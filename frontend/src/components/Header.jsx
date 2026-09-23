@@ -9,21 +9,22 @@ const Header = () => {
   const location = useLocation();
 
   React.useEffect(() => {
-    const storedUser = localStorage.getItem('user');
+    const storedUser = localStorage.getItem('aicee_user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
-  }, []);
+  }, [location.pathname]); // Update khi route thay đổi
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
+    localStorage.removeItem('aicee_user');
+    localStorage.removeItem('aicee_token');
     setUser(null);
     navigate('/login');
   };
 
   const menuItems = [
     { name: 'Tin tức', path: '/news' },
-    { name: 'Tài nguyên', path: '#' },
+    { name: 'Tài nguyên', path: '/resources' },
     { name: 'Bảng xếp hạng', path: '#' },
     { name: 'Truyền thông', path: '#' },
   ];
@@ -70,9 +71,17 @@ const Header = () => {
             </button>
             {user ? (
               <div className="flex items-center space-x-4">
-                <div className="w-10 h-10 rounded-full bg-cyan-500 flex items-center justify-center text-white font-bold shadow-lg shadow-cyan-500/20">
-                  {user.email[0].toUpperCase()}
-                </div>
+                <Link 
+                  to="/profile" 
+                  title="Xem trang cá nhân"
+                  className="w-10 h-10 rounded-full bg-cyan-500 flex items-center justify-center text-white font-bold shadow-lg shadow-cyan-500/20 hover:scale-105 transition-transform overflow-hidden"
+                >
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'
+                  )}
+                </Link>
                 <button 
                   onClick={handleLogout}
                   className="px-4 py-2 text-gray-300 hover:text-red-400 transition-colors font-medium border border-transparent hover:border-red-500/30 rounded-lg"

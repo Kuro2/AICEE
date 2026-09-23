@@ -1,7 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { findUserByEmail, createUser, verifyLogin } = require('../models/User');
+const { findUserByEmail, createUser, verifyLogin, findOrCreateSocialUser } = require('../models/User');
 const { generateToken, authenticate } = require('../middleware/auth');
+const { OAuth2Client } = require('google-auth-library');
+const axios = require('axios');
+
+// Khởi tạo Google Client
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 /**
  * @route   POST /api/auth/register
@@ -129,6 +134,106 @@ router.post('/logout', authenticate, (req, res) => {
     success: true,
     message: 'Đăng xuất thành công'
   });
+});
+
+/**
+ * @route   POST /api/auth/google
+ * @desc    Đăng nhập bằng Google
+ * @access  Public
+ */
+router.post('/google', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Thiếu Google token' });
+    }
+
+    // Lấy thông tin user từ Google bằng access_token
+    const response = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const payload = response.data;
+    
+    // Tìm hoặc tạo user
+    const profile = {
+      email: payload.email,
+      name: payload.name,
+      avatar: payload.picture,
+      provider: 'google',
+      providerId: payload.sub
+    };
+
+    const result = await findOrCreateSocialUser(profile);
+
+    if (!result.success) {
+      return res.status(401).json({ success: false, message: result.error });
+    }
+
+    const appToken = generateToken(result.user.id);
+
+    res.json({
+      success: true,
+      message: 'Đăng nhập Google thành công!',
+      data: {
+        user: result.user,
+        token: appToken
+      }
+    });
+  } catch (error) {
+    console.error('Google login error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi khi đăng nhập bằng Google' });
+  }
+});
+
+/**
+ * @route   POST /api/auth/facebook
+ * @desc    Đăng nhập bằng Facebook
+ * @access  Public
+ */
+router.post('/facebook', async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+    if (!accessToken) {
+      return res.status(400).json({ success: false, message: 'Thiếu Facebook token' });
+    }
+
+    // Lấy thông tin user từ Graph API
+    const response = await axios.get(`https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`);
+    const payload = response.data;
+    
+    if (!payload.email) {
+      return res.status(400).json({ success: false, message: 'Tài khoản Facebook chưa liên kết email' });
+    }
+
+    // Tìm hoặc tạo user
+    const profile = {
+      email: payload.email,
+      name: payload.name,
+      avatar: payload.picture?.data?.url || null,
+      provider: 'facebook',
+      providerId: payload.id
+    };
+
+    const result = await findOrCreateSocialUser(profile);
+
+    if (!result.success) {
+      return res.status(401).json({ success: false, message: result.error });
+    }
+
+    const appToken = generateToken(result.user.id);
+
+    res.json({
+      success: true,
+      message: 'Đăng nhập Facebook thành công!',
+      data: {
+        user: result.user,
+        token: appToken
+      }
+    });
+  } catch (error) {
+    console.error('Facebook login error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi khi đăng nhập bằng Facebook' });
+  }
 });
 
 module.exports = router;

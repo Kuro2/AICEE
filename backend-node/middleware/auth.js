@@ -11,7 +11,7 @@ function generateToken(userId) {
 }
 
 // Middleware xác thực JWT (bắt buộc)
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -25,7 +25,7 @@ function authenticate(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = findUserById(decoded.userId);
+    const user = await findUserById(decoded.userId);
 
     if (!user) {
       return res.status(401).json({
