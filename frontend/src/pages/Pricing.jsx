@@ -2,39 +2,43 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { Check, Info, Loader, Sparkles, Building, Code2 } from 'lucide-react';
+import { Check, Info, Loader, Sparkles, Building, Code2, QrCode, X } from 'lucide-react';
 import { subscriptionAPI, authAPI } from '@/services/api';
 
 const Pricing = () => {
   const [loading, setLoading] = useState(false);
   const [billingCycle, setBillingCycle] = useState('monthly');
+  const [paymentModal, setPaymentModal] = useState({ isOpen: false, plan: null, amount: 0 });
   const navigate = useNavigate();
   const user = authAPI.getCurrentUser();
 
-  const handleUpgrade = async (plan) => {
+  const handleUpgrade = (planId, priceString) => {
     if (!user) {
       navigate('/login');
       return;
     }
     
-    if (plan === 'free') return; // Không cần xử lý gói free
+    if (planId === 'free') return; 
+    
+    // Tính số tiền thực (loại bỏ ký tự đ và dấu chấm)
+    const amount = parseInt(priceString.replace(/\D/g, ''));
 
-    const confirmed = window.confirm(`Bạn sắp nâng cấp lên gói ${plan.toUpperCase()}. Tiếp tục thanh toán mô phỏng?`);
-    if (!confirmed) return;
+    // Mở modal thanh toán QR
+    setPaymentModal({ isOpen: true, plan: planId, amount });
+  };
 
+  const confirmPayment = async () => {
     setLoading(true);
     try {
-      const res = await subscriptionAPI.upgradePlan(plan);
+      const res = await subscriptionAPI.upgradePlan(paymentModal.plan);
       if (res.success) {
-        alert('🎉 Nâng cấp gói cước thành công!');
+        alert('🎉 Thanh toán thành công! Gói cước của bạn đã được nâng cấp.');
         
-        // Cập nhật lại thông tin user trong localStorage
         if (user) {
           const updatedUser = { ...user, plan: res.data.plan, subscriptionExpires: res.data.subscriptionExpires };
           localStorage.setItem('aicee_user', JSON.stringify(updatedUser));
         }
 
-        // Tải lại trang để cập nhật giao diện (Nút bấm, Header...)
         window.location.reload();
       } else {
         alert(res.message || 'Lỗi khi nâng cấp gói cước');
@@ -43,6 +47,7 @@ const Pricing = () => {
       alert('Có lỗi xảy ra, vui lòng thử lại.');
     } finally {
       setLoading(false);
+      setPaymentModal({ isOpen: false, plan: null, amount: 0 });
     }
   };
 
@@ -54,7 +59,7 @@ const Pricing = () => {
       price: '0đ',
       period: '/ tháng',
       buttonText: 'Gói hiện tại',
-      buttonAction: () => handleUpgrade('free'),
+      buttonAction: () => handleUpgrade('free', '0'),
       highlight: false,
       features: [
         'Giới hạn 5 lượt quét/ngày',
@@ -71,8 +76,8 @@ const Pricing = () => {
       price: '49.000đ',
       period: '/ tháng',
       buttonText: 'Nâng cấp Premium',
-      buttonAction: () => handleUpgrade('premium'),
-      highlight: true, // Nổi bật giống ChatGPT Plus
+      buttonAction: (price) => handleUpgrade('premium', price),
+      highlight: true, 
       features: [
         'Tất cả tính năng của gói Free',
         'Không giới hạn lượt quét/ngày',
@@ -89,8 +94,8 @@ const Pricing = () => {
       description: 'Dành cho Trường học & Tổ chức.',
       price: billingCycle === 'yearly' ? '583.000đ' : '625.000đ',
       period: '/ tháng',
-      buttonText: 'Liên hệ / Đăng ký',
-      buttonAction: () => handleUpgrade('business'),
+      buttonText: 'Đăng ký ngay',
+      buttonAction: (price) => handleUpgrade('business', price),
       highlight: false,
       features: [
         'Tất cả tính năng của gói Premium',
@@ -109,7 +114,7 @@ const Pricing = () => {
       price: '2.000.000đ',
       period: '/ tháng',
       buttonText: 'Nâng cấp API',
-      buttonAction: () => handleUpgrade('api'),
+      buttonAction: (price) => handleUpgrade('api', price),
       highlight: false,
       features: [
         'Cấp quyền gọi API Phân tích lõi',
@@ -190,15 +195,15 @@ const Pricing = () => {
               </div>
 
               <button
-                onClick={plan.buttonAction}
-                disabled={loading || (plan.id === 'free')}
+                onClick={() => plan.buttonAction(plan.price)}
+                disabled={plan.id === 'free'}
                 className={`w-full py-3 px-4 rounded-2xl font-semibold transition-all mb-8 flex items-center justify-center gap-2 ${
                   plan.highlight
                     ? 'bg-cyan-500 hover:bg-cyan-400 text-white shadow-lg shadow-cyan-500/25'
                     : 'bg-white hover:bg-gray-100 text-black'
                 } ${plan.id === 'free' ? 'opacity-50 cursor-not-allowed bg-[#333333] text-white hover:bg-[#333333]' : ''}`}
               >
-                {loading && plan.id !== 'free' ? <Loader className="w-5 h-5 animate-spin" /> : plan.buttonText}
+                {plan.buttonText}
               </button>
 
               <div className="space-y-4 flex-1">
@@ -220,6 +225,57 @@ const Pricing = () => {
           <span className="text-sm">Gói Business dành cho doanh nghiệp mua theo năm sẽ tiết kiệm hơn 7%.</span>
         </div>
       </main>
+
+      {/* Payment Modal */}
+      {paymentModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#1a1a1a] border border-[#333333] rounded-3xl p-8 max-w-md w-full relative animate-in fade-in zoom-in duration-300">
+            <button 
+              onClick={() => setPaymentModal({ isOpen: false, plan: null, amount: 0 })}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white bg-[#333333] rounded-full transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <QrCode className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Thanh toán Quét mã QR</h2>
+              <p className="text-gray-400">Bạn đang nâng cấp lên gói <span className="text-cyan-400 font-bold capitalize">{paymentModal.plan}</span></p>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl flex items-center justify-center mb-6">
+              {/* VietQR Image API */}
+              <img 
+                src={`https://img.vietqr.io/image/MB-1903673562013-compact2.png?amount=${paymentModal.amount}&addInfo=AICEE%20${user?.email?.split('@')[0]}%20${paymentModal.plan}&accountName=AICEE%20TECH`} 
+                alt="QR Code" 
+                className="w-full max-w-[250px] object-contain rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-3 mb-8 bg-[#222222] p-4 rounded-xl border border-[#333333]">
+              <div className="flex justify-between">
+                <span className="text-gray-400 text-sm">Số tiền:</span>
+                <span className="text-white font-bold">{paymentModal.amount.toLocaleString()} VNĐ</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400 text-sm">Nội dung:</span>
+                <span className="text-cyan-400 font-medium">AICEE {user?.email?.split('@')[0]} {paymentModal.plan}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={confirmPayment}
+              disabled={loading}
+              className="w-full py-4 px-4 bg-cyan-500 hover:bg-cyan-400 text-white rounded-xl font-bold transition-all shadow-[0_0_20px_-5px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader className="w-5 h-5 animate-spin" /> : 'Tôi đã chuyển khoản thành công'}
+            </button>
+            <p className="text-center text-xs text-gray-500 mt-4">Hệ thống sẽ tự động xác nhận trong vòng 1-3 phút.</p>
+          </div>
+        </div>
+      )}
       
       <Footer />
     </div>
