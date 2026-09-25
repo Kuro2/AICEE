@@ -51,7 +51,7 @@ async function authenticate(req, res, next) {
 }
 
 // Middleware xác thực JWT (tùy chọn - không bắt buộc)
-function optionalAuth(req, res, next) {
+async function optionalAuth(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -63,7 +63,7 @@ function optionalAuth(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = findUserById(decoded.userId);
+    req.user = await findUserById(decoded.userId);
   } catch (e) {
     req.user = null;
   }

@@ -138,6 +138,18 @@ const ChatboxAI = () => {
             timestamp: new Date(),
           },
         ]);
+      } else if (err.message && err.message.includes('401') || (err.data && err.data.message === 'Vui lòng đăng nhập để sử dụng tính năng Quét.')) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: prev.length + 2,
+            type: 'ai',
+            text: '🔒 **Yêu cầu đăng nhập:**\nBạn cần đăng nhập tài khoản (miễn phí) để trò chuyện với tôi và sử dụng tính năng quét rủi ro.',
+            action: { label: 'Đi tới Đăng nhập', to: '/login' },
+            status: 'warning',
+            timestamp: new Date(),
+          },
+        ]);
       } else {
         setError('Không thể kết nối tới server. Vui lòng thử lại.');
         setMessages((prev) => [
