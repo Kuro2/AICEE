@@ -34,7 +34,8 @@ const Pricing = () => {
           localStorage.setItem('aicee_user', JSON.stringify(updatedUser));
         }
 
-        navigate('/profile'); // Chuyển về trang profile thay vì login
+        // Tải lại trang để cập nhật giao diện (Nút bấm, Header...)
+        window.location.reload();
       } else {
         alert(res.message || 'Lỗi khi nâng cấp gói cước');
       }
