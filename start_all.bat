@@ -5,13 +5,15 @@ echo          KHOI DONG HE THONG AICEE (CYBER SECURITY)
 echo ========================================================
 echo.
 
-echo [1/2] Dang mo Backend (Node.js API)...
-start "AICEE - Backend API (Port 5000)" cmd /k "cd /d "%~dp0backend-node" && if not exist node_modules (echo Dang cai dat thu vien backend... && npm install) && echo Khoi dong Backend... && npm run dev"
+set "ROOT_DIR=%~dp0"
 
-timeout /t 3 /nobreak >nul
+echo [1/2] Dang mo Backend (Node.js API)...
+start "AICEE - Backend API (Port 5000)" "%ROOT_DIR%backend-node\run_backend.bat"
+
+timeout /t 2 >nul 2>&1 || ping 127.0.0.1 -n 3 >nul
 
 echo [2/2] Dang mo Frontend (React App)...
-start "AICEE - Frontend Web (Port 3000)" cmd /k "cd /d "%~dp0frontend" && if not exist node_modules (echo Dang cai dat thu vien frontend... && npm install) && echo Khoi dong Frontend... && npm start"
+start "AICEE - Frontend Web (Port 3000)" "%ROOT_DIR%frontend\run_frontend.bat"
 
 echo.
 echo ========================================================
@@ -19,4 +21,6 @@ echo He thong dang duoc khoi dong trong 2 cua so rieng biet:
 echo   - Backend API: http://localhost:5000
 echo   - Frontend Web: http://localhost:3000
 echo ========================================================
-pause
+echo.
+echo Nhan phim bat ky de dong cua so quan ly nay (2 cua so ung dung van chay ngam)...
+pause >nul

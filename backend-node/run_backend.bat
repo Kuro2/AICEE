@@ -1,10 +1,16 @@
 @echo off
-title AICEE - Backend API
+title AICEE - Backend API (Port 5000)
 cd /d "%~dp0"
 if not exist node_modules (
-  echo [AICEE] Installing Backend libraries...
-  npm install
+  echo [AICEE] Dang cai dat thu vien Backend...
+  call npm install
 )
-echo [AICEE] Starting Backend API at port 5000...
-npm run dev
+echo ========================================================
+echo [AICEE] Dang khoi dong Backend API tai http://localhost:5000
+echo ========================================================
+call npm run dev
+if %errorlevel% neq 0 (
+  echo.
+  echo [Loi] Backend API gap loi khi khoi dong.
+)
 pause
