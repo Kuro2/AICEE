@@ -71,4 +71,16 @@ function optionalAuth(req, res, next) {
   next();
 }
 
-module.exports = { generateToken, authenticate, optionalAuth };
+// Middleware kiểm tra quyền admin
+function isAdmin(req, res, next) {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({
+      success: false,
+      message: 'Không có quyền truy cập. Yêu cầu quyền Quản trị viên.'
+    });
+  }
+}
+
+module.exports = { generateToken, authenticate, optionalAuth, isAdmin };

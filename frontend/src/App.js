@@ -18,12 +18,20 @@ import Profile from '@/pages/Profile';
 import QuizFake from '@/pages/QuizFake';
 import QuizEmail from '@/pages/QuizEmail';
 
+// Admin Pages
+import AdminLayout from '@/components/AdminLayout';
+import AdminDashboard from '@/pages/AdminDashboard';
+import AdminUsers from '@/pages/AdminUsers';
+import AdminResources from '@/pages/AdminResources';
+import AdminNews from '@/pages/AdminNews';
+
 function App() {
   return (
     <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || 'your-client-id-here'}>
       <div className="App">
         <BrowserRouter>
           <Routes>
+            {/* User Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/news" element={<News />} />
             <Route path="/news/:id" element={<NewsDetail />} />
@@ -39,6 +47,14 @@ function App() {
             <Route path="/resources/privacy" element={<PrivacyPolicy />} />
             <Route path="/quiz/fake" element={<QuizFake />} />
             <Route path="/quiz/email" element={<QuizEmail />} />
+
+            {/* Admin Routes */}
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="resources" element={<AdminResources />} />
+              <Route path="news" element={<AdminNews />} />
+            </Route>
           </Routes>
         </BrowserRouter>
       </div>

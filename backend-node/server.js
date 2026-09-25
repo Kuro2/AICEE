@@ -62,6 +62,7 @@ const scanRoutes = require('./routes/scan');
 const newsRoutes = require('./routes/news');
 const uploadRoutes = require('./routes/upload');
 const resourcesRoutes = require('./routes/resources');
+const adminRoutes = require('./routes/admin');
 
 // ===== MOUNT ROUTES =====
 app.use('/api/auth', authRoutes);
@@ -70,6 +71,7 @@ app.use('/api/scan', scanRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/resources', resourcesRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ===== ROOT ENDPOINT =====
 app.get('/', (req, res) => {
@@ -140,6 +142,23 @@ if (process.env.MONGODB_URI) {
     .then(async () => {
       console.log('✅ MongoDB Connected');
       
+      // Seed Admin user
+      const { UserModel } = require('./models/User');
+      const bcrypt = require('bcryptjs');
+      const adminCount = await UserModel.countDocuments({ role: 'admin' });
+      if (adminCount === 0) {
+        console.log('🔄 Đang khởi tạo tài khoản Admin mặc định...');
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash('admin123', salt);
+        await UserModel.create({
+          email: 'admin@aicee.com',
+          name: 'Quản trị viên',
+          password: hashedPassword,
+          role: 'admin'
+        });
+        console.log('✅ Đã tạo tài khoản Admin (admin@aicee.com / admin123)');
+      }
+
       // Seed dữ liệu mẫu cho resources nếu chưa có
       const Resource = require('./models/Resource');
       const count = await Resource.countDocuments();

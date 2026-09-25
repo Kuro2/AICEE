@@ -137,6 +137,16 @@ const Profile = () => {
                 </div>
               </div>
 
+              {/* Tùy chọn Admin */}
+              {user.role === 'admin' && (
+                <div className="mt-8">
+                  <Link to="/admin" className="w-full flex items-center justify-center p-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl hover:from-cyan-600 hover:to-blue-700 transition shadow-lg font-bold">
+                    <Shield className="w-5 h-5 mr-2" />
+                    Truy cập Trang Quản trị (Admin Panel)
+                  </Link>
+                </div>
+              )}
+
               {/* Tùy chọn bảo mật / Cài đặt */}
               <div className="mt-10 border-t border-gray-100 pt-8">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Cài đặt bảo mật</h2>

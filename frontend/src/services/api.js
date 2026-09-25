@@ -220,5 +220,22 @@ export const resourceAPI = {
       url += `?isSafe=${isSafe}`;
     }
     return request('GET', url);
-  }
+  },
+  
+  createResource: (data) => request('POST', '/resources', data),
+  updateResource: (id, data) => request('PUT', `/resources/${id}`, data),
+  deleteResource: (id) => request('DELETE', `/resources/${id}`),
+};
+
+// ── Admin API ─────────────────────────────────────────────
+export const adminAPI = {
+  getStats: () => request('GET', '/admin/stats'),
+  getUsers: (page = 1, limit = 20) => request('GET', `/admin/users?page=${page}&limit=${limit}`),
+  changeUserRole: (id, role) => request('PUT', `/admin/users/${id}/role`, { role }),
+  deleteUser: (id) => request('DELETE', `/admin/users/${id}`),
+  
+  // Admin News CRUD (calls the new protected news endpoints)
+  createNews: (data) => request('POST', '/news', data),
+  updateNews: (id, data) => request('PUT', `/news/${id}`, data),
+  deleteNews: (id) => request('DELETE', `/news/${id}`)
 };
