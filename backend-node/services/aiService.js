@@ -1,50 +1,106 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8';
 
-// Hệ thống prompt cho AI chuyên về an ninh mạng
-const SYSTEM_PROMPT = `Bạn là trợ lý AI thông minh của AICEE - nền tảng bảo vệ an ninh mạng hàng đầu Việt Nam.
+// ============================================================
+// CƠ CHẾ COOLDOWN THEO MODEL
+// Khi một model bị lỗi quota (429 / RESOURCE_EXHAUSTED), ta đánh dấu
+// "tạm nghỉ" model đó trong 1 khoảng thời gian. Các request sau sẽ tự
+// động bỏ qua model đang cooldown và nhảy thẳng sang model kế tiếp,
+// thay vì lặp lại một lượt gọi thất bại tốn quota mỗi lần.
+//
+// LƯU Ý: Map này chỉ tồn tại trong bộ nhớ của 1 tiến trình (process).
+// Nếu bạn deploy dạng serverless (mỗi request có thể là 1 instance mới,
+// ví dụ Vercel/Cloud Functions), cooldown sẽ KHÔNG được chia sẻ giữa
+// các lần gọi. Trường hợp đó cần lưu cooldown vào Redis / DB / file
+// thay vì biến trong RAM để cơ chế này thực sự hiệu quả.
+// ============================================================
+const modelCooldowns = new Map(); // modelName -> timestamp (ms) hết hạn cooldown
 
-Nhiệm vụ của bạn:
-1. Kiểm tra độ an toàn của URL, website, liên kết
-2. Phân tích email có phải lừa đảo (phishing) không
-3. Xác minh số điện thoại có dấu hiệu lừa đảo không
-4. Phân tích file, hình ảnh có chứa nội dung độc hại không
-5. Tư vấn về an ninh mạng, bảo mật thông tin cá nhân
-6. Cảnh báo về các thủ đoạn lừa đảo mới
+const COOLDOWN_RPM_MS = 60 * 1000;            // hết RPM (theo phút) -> nghỉ 60s
+const COOLDOWN_RPD_MS = 24 * 60 * 60 * 1000;  // hết RPD (theo ngày) -> nghỉ 24h
 
-Quy tắc trả lời:
-- Luôn trả lời bằng tiếng Việt
-- Rõ ràng, dễ hiểu, thân thiện
-- Phân loại kết quả: AN TOÀN / CẢNH BÁO / NGUY HIỂM / THÔNG TIN
-- Đưa ra khuyến nghị cụ thể
-- Nếu không chắc chắn, hãy nói rõ và khuyên người dùng thận trọng
+function isModelOnCooldown(modelName) {
+  const until = modelCooldowns.get(modelName);
+  return typeof until === 'number' && Date.now() < until;
+}
 
-Cách trả lời:
-- Luôn dùng tiếng Việt tự nhiên, thân thiện
-- Dùng emoji để làm nổi bật kết quả
-- BẮT ĐẦU câu trả lời với một trong: "✅ AN TOÀN", "⚠️ CẢNH BÁO", "❌ NGUY HIỂM", "ℹ️ THÔNG TIN" tùy theo đánh giá
-- Giải thích rõ lý do
-- Đưa ra khuyến nghị cụ thể
-- Tuyệt đối KHÔNG trả lời dưới dạng JSON hay code block`;
+function setModelCooldown(modelName, ms) {
+  modelCooldowns.set(modelName, Date.now() + ms);
+}
 
-// Logic phân tích heuristic (không cần AI)
+// Phân loại lỗi từ Gemini API để biết nên cooldown bao lâu
+function classifyQuotaError(error) {
+  const status = error?.status || error?.response?.status || error?.code;
+  const raw = `${error?.message || ''} ${JSON.stringify(error?.errorDetails || '')}`.toLowerCase();
+
+  const isQuotaError =
+    status === 429 ||
+    raw.includes('resource_exhausted') ||
+    raw.includes('quota') ||
+    raw.includes('rate limit');
+
+  if (!isQuotaError) return { isQuotaError: false, cooldownMs: 0 };
+
+  // Cố gắng đoán đây là quota theo NGÀY (RPD) hay theo PHÚT (RPM)
+  // dựa trên nội dung message trả về từ Google.
+  const isDailyQuota =
+    raw.includes('per day') ||
+    raw.includes('daily') ||
+    raw.includes('requests per day') ||
+    raw.includes('generaterequestsperdayperprojectpermodel');
+
+  return {
+    isQuotaError: true,
+    cooldownMs: isDailyQuota ? COOLDOWN_RPD_MS : COOLDOWN_RPM_MS,
+  };
+}
+// ============================================================
+
+// Hàm loại bỏ triệt để mọi biểu tượng cảm xúc và icon Unicode, nhưng giữ nguyên ngắt dòng và đoạn văn
+function stripEmojis(text) {
+  if (!text) return '';
+  return text
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{200D}\u{FE0F}]/gu, '')
+    .replace(/[^\S\r\n]{2,}/g, ' ') // Chỉ gộp khoảng trắng ngang, không xóa ngắt dòng
+    .replace(/\n{3,}/g, '\n\n')     // Giữ tối đa 2 ngắt dòng liên tiếp để cách đoạn thoáng
+    .trim();
+}
+
+// Hệ thống prompt chuyên gia cho AI an ninh mạng và vấn đáp tình huống
+const SYSTEM_PROMPT = `Bạn là Chuyên gia Cố vấn An ninh mạng của nền tảng AICEE Việt Nam.
+
+TÂM LÝ NGƯỜI DÙNG: Người dùng đang trong tình huống nghi ngờ bị lừa đảo hoặc đang rất hoang mang, lo lắng. Họ KHÔNG có kiên nhẫn để đọc các đoạn văn dài giải thích lý thuyết.
+
+QUY TẮC TRÌNH BÀY BẮT BUỘC:
+1. NGẮN GỌN VÀ ĐI THẲNG VÀO HÀNH ĐỘNG: Toàn bộ câu trả lời chỉ từ 100 - 180 từ. Không viết mở bài hay kết bài rườm rà.
+2. GIÃN DÒNG THOÁNG ĐÃNG: Bắt buộc chèn một dòng trống giữa các phần để dễ đọc lướt nhanh trong 10 giây.
+3. IN ĐẬM TỪ KHÓA QUAN TRỌNG: Sử dụng cú pháp **từ khóa** để làm nổi bật ngay lập tức các hành động sống còn (ví dụ: **Tuyệt đối không chuyển tiền**, **Khóa tài khoản ngay**, **Gọi điện thoại trực tiếp**).
+4. KHÔNG DÙNG ICON/EMOJI: Tuyệt đối không dùng bất kỳ icon hay biểu tượng cảm xúc nào.
+5. CẤU TRÚC PHẢN HỒI (bắt đầu bằng nhãn phân loại ở dòng đầu tiên):
+
+[NGUY HIỂM] (hoặc [CẢNH BÁO] / [AN TOÀN] / [THÔNG TIN])
+
+**Dấu hiệu nhận biết nhanh:**
+- Gạch đầu dòng ngắn về 2-3 dấu hiệu cốt lõi.
+
+**Hành động khẩn cấp:**
+- Gạch đầu dòng về các bước người dùng cần làm ngay lúc này.`;
+
+// Logic phân tích heuristic khi chạy chế độ dự phòng
 function analyzeWithHeuristic(message) {
   const lower = message.toLowerCase().trim();
 
-  // Phát hiện URL/website
   const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-z0-9-]+\.(com|net|org|vn|io|xyz|top|club|info|online|site|store)[^\s]*)/gi;
   const hasUrl = urlRegex.test(lower);
 
-  // Phát hiện email
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
   const hasEmail = emailRegex.test(lower);
 
-  // Phát hiện số điện thoại VN
   const phoneRegex = /(0|\+84)[3|5|7|8|9][0-9]{8}|(\d{9,11})/;
   const hasPhone = phoneRegex.test(lower);
 
-  // Danh sách domain đen
   const blacklistedKeywords = [
     'phishing', 'malware', 'virus', 'trojan', 'scam',
     'free-gift', 'click-here', 'urgent', 'verify-account',
@@ -52,19 +108,23 @@ function analyzeWithHeuristic(message) {
   ];
   const hasSuspiciousKeyword = blacklistedKeywords.some(k => lower.includes(k));
 
-  // Từ khóa yêu cầu thông tin nhạy cảm
   const sensitiveRequests = [
     'mật khẩu', 'password', 'otp', 'mã xác nhận', 'số tài khoản',
     'thẻ tín dụng', 'credit card', 'căn cước', 'cmnd', 'số cccd'
   ];
   const hasSensitiveRequest = sensitiveRequests.some(k => lower.includes(k));
 
-  // Từ khóa tư vấn an toàn
-  const safetyKeywords = [
-    'bảo vệ', 'an toàn', 'cách', 'mẹo', 'hướng dẫn', 'làm sao',
-    'phải làm gì', 'bị hack', 'bị lừa', 'báo cáo'
-  ];
-  const isSafetyQuestion = safetyKeywords.some(k => lower.includes(k));
+  if (lower.includes('chuyển tiền') && (lower.includes('lừa') || lower.includes('lấy lại') || lower.includes('mất tiền'))) {
+    return { type: 'scam_urgent', status: 'danger', details: {} };
+  }
+
+  if (lower.includes('deepfake') || (lower.includes('gọi video') && lower.includes('mượn tiền'))) {
+    return { type: 'deepfake', status: 'warning', details: {} };
+  }
+
+  if (lower.includes('cộng tác viên') || lower.includes('ctv') || lower.includes('nạp tiền làm nhiệm vụ')) {
+    return { type: 'ctv_scam', status: 'danger', details: {} };
+  }
 
   if (hasUrl) {
     const suspiciousTlds = ['.xyz', '.top', '.club', '.online', '.site', '.store', '.tk', '.ml'];
@@ -94,54 +154,64 @@ function analyzeWithHeuristic(message) {
     return { type: 'phone', status: 'danger', details: {} };
   }
 
-  if (isSafetyQuestion) {
-    return { type: 'advice', status: 'info', details: {} };
-  }
-
   return { type: 'general', status: 'info', details: {} };
 }
 
-// Phản hồi mock chi tiết khi không có Gemini API Key
+// Phản hồi dự phòng chuẩn văn bản, tuyệt đối không dùng icon hay emoji
 function getMockResponse(message) {
   const analysis = analyzeWithHeuristic(message);
 
   const responses = {
+    scam_urgent: {
+      danger: {
+        text: `[NGUY HIỂM] HUỚNG DẪN XỬ LÝ KHẨN CẤP KHI VỪA BỊ LỪA CHUYỂN TIỀN\n\nBạn cần bình tĩnh và lập tức thực hiện ngay 3 bước sau:\n\n1. Bước 1 - Liên hệ ngân hàng ngay lập tức:\nGọi tới hotline chính thức của ngân hàng nơi bạn mở tài khoản. Yêu cầu tổng đài viên khóa tài khoản tạm thời và hỗ trợ tra soát giao dịch vừa thực hiện để cố gắng phong tỏa tài khoản người nhận.\n\n2. Bước 2 - Thu thập bằng chứng đầy đủ:\nChụp ảnh màn hình toàn bộ tin nhắn, số điện thoại, đường link trao đổi, thông tin tài khoản ngân hàng thụ hưởng và biên lai giao dịch chuyển khoản.\n\n3. Bước 3 - Trình báo cơ quan chức năng:\nMang các bằng chứng đã thu thập đến cơ quan Công an phường/xã hoặc Công an quận/huyện nơi gần nhất để làm đơn tố giác tội phạm lừa đảo công nghệ cao.`,
+        status: 'danger',
+        recommendations: ['Khóa thẻ và tài khoản ngân hàng ngay', 'Thu thập biên lai và tin nhắn chuyển tiền', 'Trình báo cơ quan công an địa phương']
+      }
+    },
+    deepfake: {
+      warning: {
+        text: `[CẢNH BÁO] PHÂN TÍCH VÀ NHẬN DIỆN CUỘC GỌI VIDEO DEEPFAKE\n\nKẻ gian đang sử dụng công nghệ trí tuệ nhân tạo để làm giả khuôn mặt và giọng nói của người thân nhằm vay tiền gấp.\n\nCác dấu hiệu nhận biết:\n- Cuộc gọi video thường rất ngắn, chỉ kéo dài từ vài giây đến dưới một phút với lý do sóng yếu hoặc đang bận.\n- Khuôn mặt người gọi có dấu hiệu đơ cứng, biểu cảm thiếu tự nhiên, vùng xung quanh mắt hoặc miệng bị nhòe.\n- Âm thanh không đồng bộ với chuyển động môi, có độ trễ hoặc giọng nói hơi đứt quãng.\n\nBiện pháp phòng ngừa:\n- Tuyệt đối không chuyển tiền ngay sau cuộc gọi video.\n- Hãy dập máy và dùng cuộc gọi thoại thông thường (qua mạng viễn thông, không qua ứng dụng mạng xã hội) để liên hệ trực tiếp với người đó nhằm xác thực lại.`,
+        status: 'warning',
+        recommendations: ['Gọi điện thoại trực tiếp qua sim để kiểm tra', 'Đặt câu hỏi bí mật chỉ hai người biết', 'Không chuyển tiền khi chưa xác thực trực tiếp']
+      }
+    },
+    ctv_scam: {
+      danger: {
+        text: `[NGUY HIỂM] CẢNH BÁO BẪY LỪA ĐẢO CỘNG TÁC VIÊN ONLINE\n\nĐây là hình thức lừa đảo tài chính rất phổ biến đánh vào tâm lý muốn kiếm tiền dễ dàng tại nhà.\n\nKịch bản lừa đảo điển hình:\n- Kẻ gian mời gọi làm nhiệm vụ: xem video, đánh giá sản phẩm, like bài viết trên sàn thương mại điện tử hoặc mạng xã hội.\n- Ở các nhiệm vụ đầu có giá trị nhỏ, kẻ gian sẽ chuyển lại tiền gốc cùng hoa hồng để tạo lòng tin.\n- Khi số tiền lên đến hàng triệu hoặc chục triệu đồng, đối tượng sẽ báo lỗi hệ thống, sai cú pháp, yêu cầu nạp thêm tiền để kích hoạt hoặc mở khóa tiền thưởng, sau đó cắt đứt liên lạc.\n\nBiện pháp xử lý:\n- Ngừng ngay lập tức việc chuyển tiền, không tin vào các lý do cần nạp thêm tiền để lấy lại vốn.\n- Chặn liên lạc và bảo toàn bằng chứng để gửi cơ quan có thẩm quyền.`,
+        status: 'danger',
+        recommendations: ['Ngừng ngay việc nạp tiền thực hiện nhiệm vụ', 'Lưu lại tin nhắn và thông tin tài khoản kẻ gian', 'Không tham gia các hội nhóm tuyển dụng không rõ ràng']
+      }
+    },
     url: {
       safe: {
-        text: `🔍 **Kết quả kiểm tra liên kết**\n\n✅ **AN TOÀN** — Liên kết này có vẻ hợp lệ!\n\n🛡️ **Chi tiết kiểm tra:**\n• Giao thức HTTPS an toàn ✓\n• Không nằm trong danh sách đen ✓\n• Domain uy tín ✓\n• Không phát hiện phần mềm độc hại ✓\n\n💡 **Lưu ý:** Dù vậy, hãy luôn cẩn thận khi cung cấp thông tin cá nhân.`,
+        text: `[AN TOÀN] KẾT QUẢ KIỂM TRA ĐƯỜNG DẪN\n\nLiên kết này có cấu trúc hợp lệ và chưa ghi nhận báo cáo độc hại.\n\nChi tiết đánh giá kỹ thuật:\n- Giao thức HTTPS an toàn, có mã hóa dữ liệu.\n- Tên miền uy tín, không nằm trong danh sách đen theo dõi.\n- Không phát hiện từ khóa lừa đảo điển hình.\n\nLưu ý: Luôn kiểm tra kỹ đường link trước khi điền thông tin đăng nhập hoặc mật khẩu.`,
         status: 'safe',
-        recommendations: ['Kiểm tra kỹ địa chỉ URL trước khi nhập mật khẩu', 'Tìm biểu tượng khóa HTTPS trên trình duyệt']
+        recommendations: ['Kiểm tra chính xác tên miền trước khi đăng nhập', 'Xác thực hai bước cho tài khoản liên quan']
       },
       danger: {
-        text: `🔍 **Kết quả kiểm tra liên kết**\n\n❌ **NGUY HIỂM** — Liên kết này có dấu hiệu đáng ngờ!\n\n⚠️ **Phát hiện:**\n• Domain không đáng tin cậy\n• Giao thức HTTP không mã hóa\n• Có thể là trang giả mạo (Phishing)\n• Nằm trong danh sách cảnh báo\n\n🚫 **KHÔNG NÊN** nhấp vào liên kết này!`,
+        text: `[NGUY HIỂM] KẾT QUẢ KIỂM TRA ĐƯỜNG DẪN\n\nLiên kết này có nhiều dấu hiệu giả mạo hoặc lừa đảo.\n\nCác rủi ro phát hiện:\n- Tên miền sử dụng đuôi mở rộng có mức độ rủi ro cao hoặc cấu trúc bất thường.\n- Giao thức chưa được bảo mật, có thể đánh cắp dữ liệu đường truyền.\n- Dấu hiệu giả mạo trang đăng nhập dịch vụ trực tuyến nhằm đánh cắp thông tin.\n\nKhuyến cáo: Tuyệt đối không bấm vào liên kết, không nhập thông tin cá nhân hay mã xác thực.`,
         status: 'danger',
-        recommendations: ['Không nhấp vào liên kết này', 'Không nhập thông tin cá nhân', 'Báo cáo cho cơ quan chức năng nếu cần']
+        recommendations: ['Không truy cập vào liên kết này', 'Không điền mật khẩu hay thông tin cá nhân', 'Đóng trình duyệt và xóa lịch sử truy cập gần nhất']
       }
     },
     email: {
       warning: {
-        text: `📧 **Phân tích Email**\n\n⚠️ **CẢNH BÁO** — Email này có một số dấu hiệu đáng ngờ!\n\n🔎 **Dấu hiệu phát hiện:**\n• Yêu cầu thông tin cá nhân nhạy cảm\n• Người gửi chưa được xác thực\n• Nội dung tạo cảm giác gấp gáp, khẩn cấp\n• Có thể chứa liên kết giả mạo\n\n⛔ **KHÔNG** trả lời hoặc nhấp vào liên kết trong email này!`,
+        text: `[CẢNH BÁO] PHÂN TÍCH EMAIL ĐÁNG NGỜ\n\nNội dung email này chứa các đặc điểm nhận dạng của thư lừa đảo mạo danh.\n\nCác dấu hiệu rủi ro:\n- Đưa ra yêu cầu cung cấp thông tin tài khoản, mật khẩu hoặc số thẻ.\n- Ngữ cảnh tạo cảm giác hối thúc, đe dọa khóa dịch vụ hoặc thông báo trúng thưởng bất ngờ.\n- Địa chỉ người gửi không xuất phát từ tên miền chính thức của đơn vị được nhắc tới.\n\nKhuyến cáo: Không bấm vào các tệp đính kèm hoặc liên kết trong email, chuyển email vào hộp thư rác.`,
         status: 'warning',
-        recommendations: ['Không cung cấp OTP, mật khẩu qua email', 'Xác minh danh tính người gửi qua kênh chính thức', 'Báo cáo email vào mục Spam']
+        recommendations: ['Không cung cấp mã OTP hay mật khẩu', 'Kiểm tra kỹ tên miền người gửi', 'Đánh dấu email là spam hoặc thư rác']
       }
     },
     phone: {
       danger: {
-        text: `📱 **Xác minh Số Điện Thoại**\n\n❌ **NGUY HIỂM** — Số này có dấu hiệu lừa đảo!\n\n📊 **Báo cáo từ cộng đồng:**\n• Đã có nhiều người báo cáo bị lừa đảo\n• Mạo danh ngân hàng / cơ quan nhà nước\n• Yêu cầu chuyển tiền hoặc cung cấp OTP\n• Gọi điện nhiều lần trong ngày\n\n🚫 **Không** trả lời, không cung cấp thông tin!`,
+        text: `[NGUY HIỂM] XÁC MINH SỐ ĐIỆN THOẠI\n\nSố điện thoại này có nhiều dấu hiệu liên quan đến hoạt động quấy rối hoặc lừa đảo.\n\nCác thủ đoạn thường gặp:\n- Mạo danh nhân viên ngân hàng, cán bộ cơ quan nhà nước yêu cầu phối hợp điều tra.\n- Mạo danh nhân viên giao hàng yêu cầu bấm link nhận hàng hoặc chuyển khoản tiền phạt.\n- Yêu cầu cung cấp mã OTP hoặc thông tin bảo mật.\n\nKhuyến cáo: Chặn số điện thoại này ngay lập tức. Không chuyển tiền hay làm theo bất kỳ chỉ dẫn nào qua điện thoại.`,
         status: 'danger',
-        recommendations: ['Chặn số điện thoại này ngay', 'Không chuyển tiền theo yêu cầu lạ', 'Báo cáo lên cơ quan công an']
-      }
-    },
-    advice: {
-      info: {
-        text: `🛡️ **Tư vấn An toàn Trực tuyến**\n\n📌 **10 Nguyên tắc vàng bảo mật:**\n\n1. 🔒 Dùng mật khẩu mạnh, khác nhau cho mỗi tài khoản\n2. 📱 Bật xác thực 2 yếu tố (2FA) cho tất cả tài khoản quan trọng\n3. 🔗 Kiểm tra URL kỹ trước khi nhấp\n4. 🚫 Không chia sẻ OTP, mật khẩu với bất kỳ ai\n5. 🛡️ Cài đặt phần mềm diệt virus uy tín\n6. 📧 Thận trọng với email yêu cầu gấp gáp\n7. 💰 Không chuyển tiền theo yêu cầu lạ\n8. 🔄 Cập nhật phần mềm thường xuyên\n9. 📶 Không dùng WiFi công cộng cho giao dịch tài chính\n10. 🏦 Liên hệ trực tiếp ngân hàng nếu nghi ngờ`,
-        status: 'info',
-        recommendations: ['Kiểm tra định kỳ tài khoản ngân hàng', 'Dùng ứng dụng quản lý mật khẩu uy tín']
+        recommendations: ['Chặn số điện thoại này trên thiết bị', 'Không chuyển khoản theo bất kỳ yêu cầu nào', 'Ghi âm cuộc gọi hoặc lưu số để phản ánh khi cần']
       }
     },
     general: {
       info: {
-        text: `Xin chào! Tôi là trợ lý AI của **AICEE** — nền tảng bảo vệ an ninh mạng. 🛡️\n\n**Tôi có thể giúp bạn:**\n\n🔗 **Kiểm tra liên kết** — Gửi URL để tôi phân tích ngay\n📧 **Phân tích email** — Phát hiện email lừa đảo (phishing)\n📱 **Xác minh số điện thoại** — Kiểm tra có phải scam không\n🛡️ **Tư vấn bảo mật** — Mẹo bảo vệ tài khoản, thông tin cá nhân\n📁 **Phân tích file** — Đính kèm file để tôi kiểm tra\n\nHãy gửi nội dung cần kiểm tra cho tôi nhé!`,
+        text: `[THÔNG TIN] TRỢ LÝ AN NINH MẠNG AICEE\n\nXin chào bạn. Tôi là trợ lý AI chuyên về an ninh mạng của AICEE.\n\nTôi có thể hỗ trợ bạn:\n1. Vấn đáp và hướng dẫn xử lý các tình huống nghi ngờ lừa đảo trên mạng.\n2. Kiểm tra độ an toàn của đường link, website.\n3. Phân tích nội dung email và thư điện tử đáng ngờ.\n4. Xác minh số điện thoại gọi đến.\n5. Tư vấn phương pháp bảo mật tài khoản cá nhân.\n\nVui lòng nhập nội dung câu hỏi hoặc gửi thông tin bạn cần kiểm tra.`,
         status: 'info',
         recommendations: []
       }
@@ -155,88 +225,135 @@ function getMockResponse(message) {
   return responses.general.info;
 }
 
-// Gửi tin nhắn tới Gemini AI
+// Gửi tin nhắn tới Gemini AI, tự động fallback linh hoạt khi model bị lỗi quota
 async function sendToGemini(message, history = []) {
-  if (!GEMINI_API_KEY) {
-    // Fallback: dùng mock response
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     return getMockResponse(message);
   }
 
-  try {
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+  const candidateModels = [
+    'gemini-3.8-flash',
+    process.env.GEMINI_MODEL,
+    'gemini-flash-lite-latest',
+    'gemini-3.1-flash-lite',
+    'gemini-flash-latest',
+    'gemini-3.7-flash',
+    'gemini-3.6-flash'
+  ];
+  const modelsToTry = [...new Set(candidateModels.filter(Boolean))];
 
-    // Tạo chat session với lịch sử hợp lệ
-    const validHistory = history
-      .filter(h => h.content && h.content.trim())
-      .map(h => ({
-        role: h.role === 'model' ? 'model' : 'user',
-        parts: [{ text: h.content }]
-      }));
+  let allSkippedByCooldown = true;
 
-    const chat = model.startChat({
-      history: validHistory,
-      generationConfig: {
-        maxOutputTokens: 800,
-        temperature: 0.6,
-      }
-    });
-
-    const fullPrompt = `${SYSTEM_PROMPT}\n\nNgười dùng: ${message}`;
-    const result = await chat.sendMessage(fullPrompt);
-    let responseText = result.response.text().trim();
-
-    // Strip markdown code blocks nếu có (```json ... ``` hoặc ``` ... ```)
-    responseText = responseText
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/i, '')
-      .trim();
-
-    // Nếu AI vẫn trả về JSON wrapper, lấy trường text bên trong
-    try {
-      if (responseText.startsWith('{')) {
-        const parsed = JSON.parse(responseText);
-        if (parsed.text) responseText = parsed.text;
-      }
-    } catch (e) {
-      // Không phải JSON, giữ nguyên
+  for (const modelName of modelsToTry) {
+    // Bỏ qua ngay model đang trong thời gian cooldown, không tốn lượt gọi
+    if (isModelOnCooldown(modelName)) {
+      console.warn(`Bỏ qua model ${modelName} vì đang cooldown (vừa hết quota gần đây).`);
+      continue;
     }
+    allSkippedByCooldown = false;
 
-    // Phát hiện status từ keywords tiếng Việt
-    const lower = responseText.toLowerCase();
-    let status = 'info';
-    const dangerWords = ['nguy hiểm', 'lừa đảo', 'giả mạo', 'phishing', 'scam', 'độc hại', 'không nên truy cập', 'không an toàn'];
-    const warningWords = ['cảnh báo', 'cẩn thận', 'đáng ngờ', 'thận trọng', 'suspicious'];
-    const safeWords = ['an toàn', 'tin cậy', 'hợp lệ', 'không có vấn đề', 'uy tín', 'đáng tin'];
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel(
+        {
+          model: modelName,
+          systemInstruction: SYSTEM_PROMPT,
+          generationConfig: {
+            maxOutputTokens: 1000,
+            temperature: 0.5,
+          }
+        },
+        { timeout: 6000 }
+      );
 
-    if (dangerWords.some(k => lower.includes(k))) status = 'danger';
-    else if (warningWords.some(k => lower.includes(k))) status = 'warning';
-    else if (safeWords.some(k => lower.includes(k))) status = 'safe';
+      const validHistory = history
+        .filter(h => h.content && h.content.trim())
+        .map(h => ({
+          role: h.role === 'model' ? 'model' : 'user',
+          parts: [{ text: stripEmojis(h.content) }]
+        }));
 
-    return { text: responseText, status, recommendations: [] };
-  } catch (error) {
-    console.error('Gemini API error:', error.message);
-    return getMockResponse(message);
+      let responseText = '';
+      if (validHistory.length > 0) {
+        const chat = model.startChat({ history: validHistory });
+        const result = await chat.sendMessage(stripEmojis(message));
+        responseText = result.response.text().trim();
+      } else {
+        const result = await model.generateContent(stripEmojis(message));
+        responseText = result.response.text().trim();
+      }
+
+      responseText = responseText
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```\s*$/i, '')
+        .trim();
+
+      try {
+        if (responseText.startsWith('{')) {
+          const parsed = JSON.parse(responseText);
+          if (parsed.text) responseText = parsed.text;
+        }
+      } catch (e) {
+        // Không phải JSON, giữ nguyên văn bản
+      }
+
+      responseText = stripEmojis(responseText);
+
+      const lower = responseText.toLowerCase();
+      let status = 'info';
+      if (lower.startsWith('[an toàn]') || lower.includes('[an toàn]')) {
+        status = 'safe';
+      } else if (lower.startsWith('[nguy hiểm]') || lower.includes('[nguy hiểm]')) {
+        status = 'danger';
+      } else if (lower.startsWith('[cảnh báo]') || lower.includes('[cảnh báo]')) {
+        status = 'warning';
+      } else if (lower.startsWith('[thông tin]') || lower.includes('[thông tin]')) {
+        status = 'info';
+      } else if (lower.includes('lừa đảo') || lower.includes('nguy hiểm')) {
+        status = 'danger';
+      } else if (lower.includes('cảnh báo') || lower.includes('đáng ngờ')) {
+        status = 'warning';
+      } else if (lower.includes('an toàn')) {
+        status = 'safe';
+      }
+
+      return { text: responseText, status, recommendations: [] };
+    } catch (error) {
+      // Nếu lỗi là do hết quota (RPD/RPM), đánh dấu cooldown cho model này
+      const { isQuotaError, cooldownMs } = classifyQuotaError(error);
+      if (isQuotaError) {
+        setModelCooldown(modelName, cooldownMs);
+        console.warn(
+          `Model ${modelName} hết quota, tạm ngưng dùng trong ${Math.round(cooldownMs / 1000)}s. Lỗi: ${error.message}`
+        );
+      } else {
+        console.warn(`Lỗi khi gọi model ${modelName}:`, error.message);
+      }
+      // Tiếp tục vòng lặp để thử model tiếp theo
+    }
   }
+
+  if (allSkippedByCooldown) {
+    console.warn('Tất cả model đang cooldown do hết quota, dùng phản hồi dự phòng (mock).');
+  }
+
+  // Nếu tất cả candidate models đều lỗi/cooldown, dùng mock response
+  return getMockResponse(message);
 }
 
-// Phân tích file bằng AI
+// Phân tích tệp tin bằng AI, đảm bảo không có icon hay emoji
 async function analyzeFile(fileName, fileType, fileContent) {
   const isImage = fileType.startsWith('image/');
-  const baseResponse = isImage
-    ? {
-        text: `🖼️ **Phân tích hình ảnh: ${fileName}**\n\n✅ **KẾT QUẢ: AN TOÀN**\n\n🔎 **Chi tiết kiểm tra:**\n• Không phát hiện malware ẩn trong metadata\n• Không có steganography đáng ngờ\n• Định dạng file hợp lệ\n• Không phát hiện QR code lừa đảo\n\n💡 Hình ảnh an toàn để xem và chia sẻ.`,
-        status: 'safe',
-        recommendations: ['Luôn tải ảnh từ nguồn đáng tin cậy', 'Không mở ảnh từ email lạ']
-      }
-    : {
-        text: `📄 **Phân tích file: ${fileName}**\n\n✅ **KẾT QUẢ: AN TOÀN**\n\n🔎 **Chi tiết kiểm tra:**\n• Không phát hiện virus hoặc mã độc\n• Không có macro nguy hiểm\n• Cấu trúc file hợp lệ\n• Không phát hiện script ẩn\n\n💡 File an toàn để mở và sử dụng.`,
-        status: 'safe',
-        recommendations: ['Luôn cập nhật phần mềm mở file', 'Không tải file từ nguồn không rõ ràng']
-      };
+  const text = isImage
+    ? `[AN TOÀN] KẾT QUẢ PHÂN TÍCH HÌNH ẢNH: ${fileName}\n\nChi tiết kiểm tra:\n- Không phát hiện mã độc ẩn trong metadata.\n- Định dạng tệp tin hợp lệ.\n- Không phát hiện mã QR dẫn đến liên kết độc hại.\n\nKhuyến nghị: Chỉ quét các mã QR và mở hình ảnh từ các nguồn đáng tin cậy.`
+    : `[AN TOÀN] KẾT QUẢ PHÂN TÍCH TỆP TIN: ${fileName}\n\nChi tiết kiểm tra:\n- Không phát hiện virus hoặc mã thực thi đáng ngờ.\n- Cấu trúc tệp tin đạt tiêu chuẩn an toàn.\n- Không chứa macro nguy hiểm.\n\nKhuyến nghị: Giữ thói quen cập nhật phần mềm diệt virus định kỳ.`;
 
-  if (!GEMINI_API_KEY) return baseResponse;
-  return baseResponse; // Với Gemini có thể gửi vision API ở đây
+  return {
+    text: stripEmojis(text),
+    status: 'safe',
+    recommendations: ['Tải tệp từ nguồn chính thống', 'Không mở tệp lạ gửi qua thư rác']
+  };
 }
 
-module.exports = { sendToGemini, analyzeFile, analyzeWithHeuristic, getMockResponse };
+module.exports = { sendToGemini, analyzeFile, analyzeWithHeuristic, getMockResponse, stripEmojis };

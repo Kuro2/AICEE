@@ -211,23 +211,23 @@ function analyzePhone(phone) {
   return result;
 }
 
-// Format response thống nhất để trả về API
+// Format response thống nhất để trả về API (không dùng emoji)
 function formatScanResponse(scanType, result) {
   const statusMessages = {
-    safe: { label: 'AN TOÀN', emoji: '✅' },
-    warning: { label: 'CẢNH BÁO', emoji: '⚠️' },
-    danger: { label: 'NGUY HIỂM', emoji: '❌' },
-    info: { label: 'THÔNG TIN', emoji: 'ℹ️' }
+    safe: { label: 'AN TOÀN' },
+    warning: { label: 'CẢNH BÁO' },
+    danger: { label: 'NGUY HIỂM' },
+    info: { label: 'THÔNG TIN' }
   };
 
   const msg = statusMessages[result.status] || statusMessages.info;
 
-  let text = `${msg.emoji} **Kết quả: ${msg.label}**\n\n`;
+  let text = `[${msg.label}] KẾT QUẢ KIỂM TRA\n\n`;
 
   if (result.issues.length > 0) {
-    text += `📋 **Phát hiện:**\n${result.issues.map(i => `• ${i}`).join('\n')}\n\n`;
+    text += `Danh sách phát hiện:\n${result.issues.map(i => `- ${i}`).join('\n')}\n\n`;
   } else {
-    text += `📋 **Không phát hiện vấn đề đáng ngờ.**\n\n`;
+    text += `Không phát hiện vấn đề đáng ngờ.\n\n`;
   }
 
   const recommendations = {

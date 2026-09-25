@@ -24,14 +24,14 @@ router.post('/url', async (req, res) => {
     const formatted = formatScanResponse('url', scanResult);
 
     // Tạo text phản hồi chi tiết
-    let responseText = `🔍 **Kiểm tra URL: ${url}**\n\n`;
+    let responseText = `[KIỂM TRA URL] ${url}\n\n`;
     responseText += `${formatted.text}`;
 
     if (scanResult.details.hostname) {
-      responseText += `\n📊 **Thông tin kỹ thuật:**\n`;
-      responseText += `• Domain: ${scanResult.details.hostname}\n`;
-      responseText += `• Giao thức: ${scanResult.details.isHttps ? '🔒 HTTPS (An toàn)' : '⚠️ HTTP (Không mã hóa)'}\n`;
-      responseText += `• Điểm an toàn: ${scanResult.score}/100\n`;
+      responseText += `Thông tin kỹ thuật:\n`;
+      responseText += `- Domain: ${scanResult.details.hostname}\n`;
+      responseText += `- Giao thức: ${scanResult.details.isHttps ? 'HTTPS (Mã hóa an toàn)' : 'HTTP (Không mã hóa)'}\n`;
+      responseText += `- Điểm an toàn: ${scanResult.score}/100\n`;
     }
 
     res.json({
@@ -75,7 +75,7 @@ router.post('/email', async (req, res) => {
     const scanResult = analyzeEmail(email, subject || '', body || '');
     const formatted = formatScanResponse('email', scanResult);
 
-    let responseText = `📧 **Phân tích Email: ${email}**\n\n`;
+    let responseText = `[PHÂN TÍCH EMAIL] ${email}\n\n`;
     responseText += formatted.text;
 
     res.json({
@@ -119,7 +119,7 @@ router.post('/phone', async (req, res) => {
     const scanResult = analyzePhone(phone);
     const formatted = formatScanResponse('phone', scanResult);
 
-    let responseText = `📱 **Xác minh Số Điện Thoại: ${phone}**\n\n`;
+    let responseText = `[XÁC MINH SỐ ĐIỆN THOẠI] ${phone}\n\n`;
     responseText += formatted.text;
 
     res.json({

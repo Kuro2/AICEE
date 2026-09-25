@@ -62,9 +62,7 @@ const Header = () => {
 
           {/* Action Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            <button className="text-red-400 hover:text-red-300 transition-colors font-medium">
-              • Trực tiếp
-            </button>
+           
             <button 
               onClick={() => navigate('/chatbox')}
               className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-400 hover:to-blue-400 transition-all shadow-lg hover:shadow-cyan-500/50 font-medium"
@@ -90,7 +88,7 @@ const Header = () => {
                     )}
                   </div>
                   {isPremium && (
-                    <div className="absolute -top-1.5 -right-1 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 p-0.5 rounded-full shadow-md" title="Tài khoản Premium VIP">
+                    <div className="absolute -top-1.5 -right-1 bg-cyan-500 text-slate-950 p-0.5 rounded-full shadow-md" title="Tài khoản Premium">
                       <Crown className="w-3 h-3 fill-current" />
                     </div>
                   )}

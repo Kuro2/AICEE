@@ -12,7 +12,7 @@ const generateNewSessionId = () => `session-${Date.now()}-${Math.random().toStri
 const defaultGreeting = {
   id: 1,
   type: 'ai',
-  text: 'Xin chào! Tôi là trợ lý AI của **AICEE** 🛡️\n\nTôi có thể giúp bạn:\n🔗 Kiểm tra độ an toàn website\n📧 Phân tích email lừa đảo\n📱 Xác minh số điện thoại\n🛡️ Tư vấn an ninh mạng\n📁 Phân tích file\n\nHãy gửi nội dung cần kiểm tra cho tôi!',
+  text: 'Xin chào! Tôi là trợ lý AI của AICEE.\n\nTôi có thể hỗ trợ bạn:\n- Vấn đáp và tư vấn xử lý các tình huống lừa đảo\n- Kiểm tra độ an toàn website, liên kết\n- Phân tích email lừa đảo\n- Xác minh số điện thoại\n- Phân tích tệp tin\n\nHãy chọn một chủ đề gợi ý hoặc nhập nội dung bạn cần hỗ trợ.',
   status: 'info',
   timestamp: new Date(),
 };
@@ -33,7 +33,6 @@ const ChatboxAI = () => {
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
-  const [sidebarTab, setSidebarTab] = useState('history'); // 'history' | 'suggestions'
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -274,11 +273,12 @@ const ChatboxAI = () => {
   };
 
   const quickActions = [
-    { icon: '🔗', text: 'Kiểm tra website', prompt: 'Kiểm tra website này: ' },
-    { icon: '📧', text: 'Phân tích email', prompt: 'Phân tích email lừa đảo: ' },
-    { icon: '📱', text: 'Xác minh số điện thoại', prompt: 'Xác minh số điện thoại: ' },
-    { icon: '🛡️', text: 'Mẹo bảo vệ an toàn', prompt: 'Cho tôi các mẹo bảo vệ an toàn trực tuyến' },
-    { icon: '📋', text: 'Tôi bị lừa đảo?', prompt: 'Tôi vừa nhận được tin nhắn đáng ngờ, phải làm gì?' },
+    { text: 'Bị lừa chuyển tiền cần làm gì?', prompt: 'Tôi vừa bị lừa chuyển tiền cho kẻ gian, tôi cần làm gì ngay bây giờ để xử lý?' },
+    { text: 'Nhận biết cuộc gọi Deepfake', prompt: 'Làm thế nào để nhận diện cuộc gọi video Deepfake giả mạo người thân mượn tiền?' },
+    { text: 'Bẫy tuyển dụng CTV online', prompt: 'Dấu hiệu nhận biết lừa đảo tuyển dụng cộng tác viên nạp tiền làm nhiệm vụ?' },
+    { text: 'Kiểm tra website nghi ngờ', prompt: 'Kiểm tra độ an toàn của trang web này: ' },
+    { text: 'Phân tích email đáng ngờ', prompt: 'Phân tích nội dung email nghi ngờ lừa đảo: ' },
+    { text: 'Xác minh số điện thoại', prompt: 'Xác minh số điện thoại gọi đến có dấu hiệu lừa đảo không: ' },
   ];
 
   const getStatusIcon = (status) => {
@@ -306,13 +306,21 @@ const ChatboxAI = () => {
 
   const renderText = (text) => {
     return text.split('\n').map((line, i) => {
+      if (!line.trim()) {
+        return <span key={i} className="block h-2" />;
+      }
       const parts = line.split(/\*\*(.*?)\*\*/g);
       return (
-        <span key={i}>
+        <span key={i} className="block leading-relaxed my-0.5">
           {parts.map((part, j) =>
-            j % 2 === 1 ? <strong key={j}>{part}</strong> : part
+            j % 2 === 1 ? (
+              <strong key={j} className="text-white font-bold bg-white/10 px-1 py-0.5 rounded">
+                {part}
+              </strong>
+            ) : (
+              part
+            )
           )}
-          {i < text.split('\n').length - 1 && <br />}
         </span>
       );
     });
@@ -338,7 +346,7 @@ const ChatboxAI = () => {
                   <div className="flex items-center space-x-2">
                     <h1 className="text-lg font-bold text-white">AICEE AI Assistant</h1>
                     {isPremium ? (
-                      <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20">
+                      <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-cyan-500 text-slate-950 text-xs font-bold shadow-md">
                         <Crown className="w-3 h-3 fill-current" />
                         <span>PREMIUM</span>
                       </span>
@@ -357,16 +365,6 @@ const ChatboxAI = () => {
             </div>
 
             <div className="flex items-center space-x-2">
-              {!isPremium && (
-                <button
-                  onClick={() => navigate('/pricing')}
-                  className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold rounded-lg text-xs shadow-md transition-all animate-pulse"
-                >
-                  <Crown className="w-3.5 h-3.5 fill-current" />
-                  <span>Nâng cấp VIP</span>
-                </button>
-              )}
-
               <button
                 onClick={clearChat}
                 className="flex items-center space-x-1 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-gray-400 hover:text-white rounded-lg transition-all text-sm"
@@ -400,14 +398,14 @@ const ChatboxAI = () => {
       )}
 
       {/* ── Main Layout ── */}
-      <div className="flex-1 overflow-hidden flex min-h-0">
+      <div className="flex-1 overflow-hidden flex min-h-0 h-full">
         {/* Sidebar */}
         <aside
           className={`${
-            isMobileMenuOpen ? 'block' : 'hidden'
-          } md:block w-full md:w-72 bg-slate-900/80 border-r border-slate-800 p-3 overflow-y-auto flex-shrink-0 flex flex-col justify-between`}
+            isMobileMenuOpen ? 'flex' : 'hidden'
+          } md:flex w-full md:w-72 bg-slate-900/80 border-r border-slate-800 p-3 flex-shrink-0 flex-col justify-between self-stretch h-full`}
         >
-          <div className="space-y-3">
+          <div className="space-y-3 flex-1 overflow-y-auto min-h-0 pr-0.5">
             {/* New Chat Button */}
             <button
               onClick={handleNewChat}
@@ -417,32 +415,8 @@ const ChatboxAI = () => {
               <span>Cuộc trò chuyện mới</span>
             </button>
 
-            {/* Sidebar Tabs if Premium */}
-            {isPremium ? (
-              <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800 text-xs font-medium">
-                <button
-                  onClick={() => setSidebarTab('history')}
-                  className={`flex-1 py-1.5 rounded-md flex items-center justify-center space-x-1.5 transition-colors ${
-                    sidebarTab === 'history' ? 'bg-slate-800 text-cyan-400 font-bold' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Lịch sử chat</span>
-                </button>
-                <button
-                  onClick={() => setSidebarTab('suggestions')}
-                  className={`flex-1 py-1.5 rounded-md flex items-center justify-center space-x-1.5 transition-colors ${
-                    sidebarTab === 'suggestions' ? 'bg-slate-800 text-cyan-400 font-bold' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Gợi ý</span>
-                </button>
-              </div>
-            ) : null}
-
-            {/* Tab: History (Premium Only) */}
-            {isPremium && sidebarTab === 'history' ? (
+            {/* Lịch sử chat (cho tài khoản Premium) */}
+            {isPremium && (
               <div className="space-y-1.5 pt-1">
                 <div className="flex items-center justify-between text-xs text-gray-400 px-1 mb-2">
                   <span>Hội thoại đã lưu ({sessions.length})</span>
@@ -514,52 +488,28 @@ const ChatboxAI = () => {
                   </div>
                 )}
               </div>
-            ) : null}
-
-            {/* Quick Actions / Suggestions */}
-            {(!isPremium || sidebarTab === 'suggestions') && (
-              <div className="space-y-1.5">
-                <h3 className="text-gray-400 font-semibold mb-2 flex items-center space-x-1.5 text-xs">
-                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Gợi ý bảo mật nhanh</span>
-                </h3>
-                <div className="space-y-1.5">
-                  {quickActions.map((action, index) => (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        setInputText(action.prompt);
-                        setIsMobileMenuOpen(false);
-                        textareaRef.current?.focus();
-                      }}
-                      className="w-full text-left px-2.5 py-2 bg-slate-800/40 hover:bg-slate-800 border border-slate-700/60 hover:border-cyan-500/40 rounded-lg text-gray-300 transition-all flex items-center space-x-2 text-xs"
-                    >
-                      <span className="text-base flex-shrink-0">{action.icon}</span>
-                      <span className="truncate">{action.text}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
             )}
           </div>
 
-          {/* Bottom Upgrade Banner for Free Users */}
+          {/* Bottom Upgrade Banner for Free Users (dưới cùng) */}
           {!isPremium && (
-            <div className="mt-4 p-3 bg-gradient-to-br from-amber-500/10 via-purple-500/10 to-blue-500/10 border border-amber-500/30 rounded-xl text-left">
-              <div className="flex items-center space-x-1.5 mb-1 text-amber-400 text-xs font-bold">
-                <Crown className="w-3.5 h-3.5 fill-current" />
-                <span>Nâng Cấp Premium</span>
+            <div className="mt-auto pt-3 flex-shrink-0">
+              <div className="p-3 bg-slate-800/80 border border-slate-700 hover:border-cyan-500/40 rounded-xl text-left transition-colors">
+                <div className="flex items-center space-x-1.5 mb-1 text-cyan-400 text-xs font-semibold">
+                  <Crown className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Nâng Cấp Premium</span>
+                </div>
+                <p className="text-[11px] text-gray-300 leading-snug mb-2.5">
+                  Tự động lưu trữ và mở lại toàn bộ lịch sử các cuộc hội thoại không giới hạn.
+                </p>
+                <button
+                  onClick={() => navigate('/pricing')}
+                  className="w-full py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold rounded-lg text-xs transition-colors flex items-center justify-center space-x-1.5"
+                >
+                  <span>Xem gói cước</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
               </div>
-              <p className="text-[11px] text-gray-300 leading-snug mb-2.5">
-                Tự động lưu trữ và mở lại toàn bộ lịch sử các cuộc hội thoại không giới hạn.
-              </p>
-              <button
-                onClick={() => navigate('/pricing')}
-                className="w-full py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold rounded-lg text-xs shadow-md transition-all flex items-center justify-center space-x-1"
-              >
-                <span>Xem gói cước</span>
-                <ExternalLink className="w-3 h-3" />
-              </button>
             </div>
           )}
         </aside>
@@ -642,7 +592,7 @@ const ChatboxAI = () => {
 
                     {message.recommendations && message.recommendations.length > 0 && (
                       <div className="mt-3 pt-2 border-t border-slate-700/50">
-                        <p className="text-xs text-gray-400 font-semibold mb-1.5">💡 Khuyến nghị:</p>
+                        <p className="text-xs text-gray-400 font-semibold mb-1.5">Khuyến nghị:</p>
                         <ul className="space-y-1">
                           {message.recommendations.map((r, i) => (
                             <li key={i} className="text-xs text-gray-300 flex items-start space-x-1">
@@ -696,6 +646,25 @@ const ChatboxAI = () => {
               ))}
             </div>
           )}
+
+          {/* Quick Topic Chips above input */}
+          <div className="px-4 py-2 bg-slate-900/80 border-t border-slate-800 flex items-center space-x-2 overflow-x-auto">
+            <span className="text-[11px] text-gray-400 whitespace-nowrap flex-shrink-0 font-medium">
+              Chủ đề gợi ý:
+            </span>
+            {quickActions.map((action, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  setInputText(action.prompt);
+                  textareaRef.current?.focus();
+                }}
+                className="px-3 py-1 rounded-full bg-slate-800/80 hover:bg-slate-700 text-gray-300 hover:text-cyan-400 border border-slate-700/80 hover:border-cyan-500/40 text-xs whitespace-nowrap transition-all flex items-center flex-shrink-0"
+              >
+                <span>{action.text}</span>
+              </button>
+            ))}
+          </div>
 
           {/* Input Area */}
           <div className="p-4 bg-slate-900/80 border-t border-slate-800/80 backdrop-blur-sm">
