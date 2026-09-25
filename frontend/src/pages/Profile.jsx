@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { User, Mail, Shield, Calendar, LogOut, Loader, ArrowLeft, Lock } from 'lucide-react';
+import { User, Mail, Shield, Calendar, LogOut, Loader, ArrowLeft, Lock, Crown, Sparkles, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { authAPI } from '@/services/api';
 
@@ -109,7 +109,48 @@ const Profile = () => {
                 </button>
               </div>
 
-              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Subscription Plan Card */}
+                <div className={`p-4 rounded-xl border flex items-center justify-between ${
+                  user.isPremium || user.plan === 'premium'
+                    ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200'
+                    : 'bg-gray-50 border-gray-100'
+                }`}>
+                  <div className="flex items-center">
+                    <div className={`p-3 rounded-lg mr-4 ${
+                      user.isPremium || user.plan === 'premium'
+                        ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
+                        : 'bg-gray-200 text-gray-700'
+                    }`}>
+                      <Crown className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Gói dịch vụ</p>
+                      <p className="font-bold text-gray-900 flex items-center space-x-1">
+                        <span>{user.isPremium || user.plan === 'premium' ? 'AICEE Premium' : 'Gói Miễn Phí'}</span>
+                        {user.isPremium || user.plan === 'premium' ? (
+                          <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded">VIP</span>
+                        ) : null}
+                      </p>
+                      {user.planExpiry && (
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          Hạn: {new Date(user.planExpiry).toLocaleDateString('vi-VN')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Link
+                    to="/pricing"
+                    className={`text-xs px-3 py-1.5 rounded-lg font-bold transition ${
+                      user.isPremium || user.plan === 'premium'
+                        ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                  >
+                    {user.isPremium || user.plan === 'premium' ? 'Gia hạn' : 'Nâng cấp'}
+                  </Link>
+                </div>
+
                 {/* Role Card */}
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex items-center">
                   <div className="p-3 bg-blue-100 text-blue-600 rounded-lg mr-4">

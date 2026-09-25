@@ -17,6 +17,10 @@ import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import Profile from '@/pages/Profile';
 import QuizFake from '@/pages/QuizFake';
 import QuizEmail from '@/pages/QuizEmail';
+import Pricing from '@/pages/Pricing';
+import PaymentSuccess from '@/pages/PaymentSuccess';
+import PaymentFailed from '@/pages/PaymentFailed';
+import CheckoutSimulator from '@/pages/CheckoutSimulator';
 
 function App() {
   return (
@@ -30,6 +34,10 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/chatbox" element={<ChatboxAI />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/payment/success" element={<PaymentSuccess />} />
+            <Route path="/payment/failed" element={<PaymentFailed />} />
+            <Route path="/payment/checkout-simulator" element={<CheckoutSimulator />} />
             <Route path="/resources" element={<Resources />} />
             <Route path="/resources/unsafe" element={<UnsafeList />} />
             <Route path="/resources/safe" element={<SafeList />} />

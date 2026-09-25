@@ -9,7 +9,10 @@ const userSchema = new mongoose.Schema({
   avatar: { type: String, default: null },
   lastLogin: { type: Date, default: null },
   googleId: { type: String, default: null },
-  facebookId: { type: String, default: null }
+  facebookId: { type: String, default: null },
+  plan: { type: String, enum: ['free', 'premium'], default: 'free' },
+  planExpiry: { type: Date, default: null },
+  chatLimit: { type: Number, default: 10 }
 }, {
   timestamps: true
 });
@@ -19,10 +22,13 @@ const UserModel = mongoose.models.User || mongoose.model('User', userSchema);
 // Đảm bảo tương thích ngược với API hiện tại (trả về id thay vì _id)
 function formatUser(userDoc) {
   if (!userDoc) return null;
-  const obj = userDoc.toObject ? userDoc.toObject() : userDoc;
-  obj.id = obj._id.toString();
+  const obj = userDoc.toObject ? userDoc.toObject() : { ...userDoc };
+  obj.id = (obj._id || obj.id || '').toString();
   delete obj._id;
   delete obj.__v;
+  // Tính toán trạng thái Premium còn hạn
+  const isPrem = obj.plan === 'premium' && (!obj.planExpiry || new Date(obj.planExpiry) > new Date());
+  obj.isPremium = isPrem;
   return obj;
 }
 

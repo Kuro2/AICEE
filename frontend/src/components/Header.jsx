@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Shield, Menu, X } from 'lucide-react';
+import { Shield, Menu, X, Crown } from 'lucide-react';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -22,11 +22,13 @@ const Header = () => {
     navigate('/login');
   };
 
+  const isPremium = user?.isPremium || user?.plan === 'premium';
+
   const menuItems = [
+    { name: 'Bảng giá', path: '/pricing' },
     { name: 'Tin tức', path: '/news' },
     { name: 'Tài nguyên', path: '/resources' },
     { name: 'Bảng xếp hạng', path: '#' },
-    { name: 'Truyền thông', path: '#' },
   ];
 
   return (
@@ -74,12 +76,23 @@ const Header = () => {
                 <Link 
                   to="/profile" 
                   title="Xem trang cá nhân"
-                  className="w-10 h-10 rounded-full bg-cyan-500 flex items-center justify-center text-white font-bold shadow-lg shadow-cyan-500/20 hover:scale-105 transition-transform overflow-hidden"
+                  className="relative group"
                 >
-                  {user?.avatar ? (
-                    <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  ) : (
-                    user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-lg transition-transform overflow-hidden ${
+                    isPremium 
+                      ? 'bg-gradient-to-tr from-amber-500 to-amber-300 ring-2 ring-amber-400/80 shadow-amber-500/30' 
+                      : 'bg-cyan-500 shadow-cyan-500/20'
+                  }`}>
+                    {user?.avatar ? (
+                      <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'
+                    )}
+                  </div>
+                  {isPremium && (
+                    <div className="absolute -top-1.5 -right-1 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 p-0.5 rounded-full shadow-md" title="Tài khoản Premium VIP">
+                      <Crown className="w-3 h-3 fill-current" />
+                    </div>
                   )}
                 </Link>
                 <button 
