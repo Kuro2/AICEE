@@ -26,9 +26,15 @@ const Pricing = () => {
     try {
       const res = await subscriptionAPI.upgradePlan(plan);
       if (res.success) {
-        alert('🎉 Nâng cấp gói cước thành công! Vui lòng đăng nhập lại để cập nhật hệ thống.');
-        authAPI.logout();
-        navigate('/login');
+        alert('🎉 Nâng cấp gói cước thành công!');
+        
+        // Cập nhật lại thông tin user trong localStorage
+        if (user) {
+          const updatedUser = { ...user, plan: res.data.plan, subscriptionExpires: res.data.subscriptionExpires };
+          localStorage.setItem('aicee_user', JSON.stringify(updatedUser));
+        }
+
+        navigate('/profile'); // Chuyển về trang profile thay vì login
       } else {
         alert(res.message || 'Lỗi khi nâng cấp gói cước');
       }
