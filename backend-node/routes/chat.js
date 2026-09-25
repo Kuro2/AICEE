@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { sendToGemini, analyzeFile } = require('../services/aiService');
 const { optionalAuth } = require('../middleware/auth');
+const { checkScanLimit } = require('../middleware/subscription');
 
 // Lưu lịch sử chat trong memory (theo session)
 const chatHistories = new Map();
@@ -13,7 +14,7 @@ const MAX_HISTORY_LENGTH = 20; // Tối đa 20 tin nhắn mỗi session
  * @desc    Gửi tin nhắn tới AI và nhận phản hồi
  * @access  Public (có thể không cần đăng nhập)
  */
-router.post('/', optionalAuth, async (req, res) => {
+router.post('/', optionalAuth, checkScanLimit, async (req, res) => {
   try {
     const { message, sessionId, files } = req.body;
 

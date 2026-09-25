@@ -9,7 +9,12 @@ const userSchema = new mongoose.Schema({
   avatar: { type: String, default: null },
   lastLogin: { type: Date, default: null },
   googleId: { type: String, default: null },
-  facebookId: { type: String, default: null }
+  facebookId: { type: String, default: null },
+  // Các trường phục vụ chức năng đăng ký (Subscription)
+  plan: { type: String, enum: ['free', 'premium', 'business', 'api'], default: 'free' },
+  scanCount: { type: Number, default: 0 },
+  lastScanReset: { type: Date, default: null },
+  subscriptionExpires: { type: Date, default: null }
 }, {
   timestamps: true
 });

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Shield, Send, User, Bot, Home, Menu, X, Sparkles,
   AlertCircle, CheckCircle, Info, Paperclip, File, Trash2,
@@ -126,18 +126,31 @@ const ChatboxAI = () => {
       };
       setMessages((prev) => [...prev, aiMessage]);
     } catch (err) {
-      setError('Không thể kết nối tới server. Vui lòng thử lại.');
-      // Thêm error message vào chat
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: prev.length + 2,
-          type: 'ai',
-          text: '❌ Xin lỗi, tôi gặp sự cố kết nối. Vui lòng thử lại sau.',
-          status: 'info',
-          timestamp: new Date(),
-        },
-      ]);
+      if (err.data && err.data.isLimitReached) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: prev.length + 2,
+            type: 'ai',
+            text: `⚠️ **Giới hạn gói cước:**\n${err.message}`,
+            action: { label: 'Nâng cấp Gói cước', to: '/pricing' },
+            status: 'warning',
+            timestamp: new Date(),
+          },
+        ]);
+      } else {
+        setError('Không thể kết nối tới server. Vui lòng thử lại.');
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: prev.length + 2,
+            type: 'ai',
+            text: '❌ Xin lỗi, tôi gặp sự cố kết nối. Vui lòng thử lại sau.',
+            status: 'info',
+            timestamp: new Date(),
+          },
+        ]);
+      }
     } finally {
       setIsTyping(false);
     }
@@ -403,6 +416,18 @@ const ChatboxAI = () => {
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    )}
+
+                    {/* Action Button */}
+                    {message.action && (
+                      <div className="mt-4">
+                        <Link 
+                          to={message.action.to} 
+                          className="inline-block px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-400 hover:to-blue-400 font-medium transition shadow"
+                        >
+                          {message.action.label}
+                        </Link>
                       </div>
                     )}
 

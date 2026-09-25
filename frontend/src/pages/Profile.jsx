@@ -135,6 +135,26 @@ const Profile = () => {
                     </p>
                   </div>
                 </div>
+
+                {/* Gói cước Card */}
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex items-center justify-between col-span-1 md:col-span-2">
+                  <div className="flex items-center">
+                    <div className="p-3 bg-purple-100 text-purple-600 rounded-lg mr-4">
+                      <Shield className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Gói cước hiện tại</p>
+                      <p className="font-bold text-gray-900 uppercase">
+                        {user.plan === 'premium' ? 'Premium (Pro)' : user.plan === 'business' ? 'Business' : user.plan === 'api' ? 'Platform API' : 'Free (Cơ bản)'}
+                      </p>
+                    </div>
+                  </div>
+                  {user.plan === 'free' && (
+                    <Link to="/pricing" className="px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-medium rounded-lg shadow hover:opacity-90 transition">
+                      Nâng cấp ngay
+                    </Link>
+                  )}
+                </div>
               </div>
 
               {/* Tùy chọn Admin */}

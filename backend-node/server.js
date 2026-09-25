@@ -63,6 +63,7 @@ const newsRoutes = require('./routes/news');
 const uploadRoutes = require('./routes/upload');
 const resourcesRoutes = require('./routes/resources');
 const adminRoutes = require('./routes/admin');
+const subscriptionRoutes = require('./routes/subscription');
 
 // ===== MOUNT ROUTES =====
 app.use('/api/auth', authRoutes);
@@ -72,6 +73,7 @@ app.use('/api/news', newsRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/resources', resourcesRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 // ===== ROOT ENDPOINT =====
 app.get('/', (req, res) => {

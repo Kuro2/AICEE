@@ -25,7 +25,9 @@ async function request(method, path, body = null) {
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.message || `HTTP ${res.status}`);
+      const error = new Error(data.message || `HTTP ${res.status}`);
+      error.data = data;
+      throw error;
     }
     return data;
   } catch (err) {
@@ -238,4 +240,10 @@ export const adminAPI = {
   createNews: (data) => request('POST', '/news', data),
   updateNews: (id, data) => request('PUT', `/news/${id}`, data),
   deleteNews: (id) => request('DELETE', `/news/${id}`)
+};
+
+// ── Subscription API ──────────────────────────────────────
+export const subscriptionAPI = {
+  getSubscription: () => request('GET', '/subscription'),
+  upgradePlan: (plan) => request('POST', '/subscription/upgrade', { plan })
 };

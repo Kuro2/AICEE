@@ -2,13 +2,15 @@ const express = require('express');
 const router = express.Router();
 const { analyzeUrl, analyzeEmail, analyzePhone, formatScanResponse } = require('../services/scanService');
 const { sendToGemini } = require('../services/aiService');
+const { optionalAuth } = require('../middleware/auth');
+const { checkScanLimit } = require('../middleware/subscription');
 
 /**
  * @route   POST /api/scan/url
  * @desc    Kiểm tra độ an toàn của URL
  * @access  Public
  */
-router.post('/url', async (req, res) => {
+router.post('/url', optionalAuth, checkScanLimit, async (req, res) => {
   try {
     const { url } = req.body;
 
@@ -61,7 +63,7 @@ router.post('/url', async (req, res) => {
  * @desc    Phân tích email lừa đảo
  * @access  Public
  */
-router.post('/email', async (req, res) => {
+router.post('/email', optionalAuth, checkScanLimit, async (req, res) => {
   try {
     const { email, subject, body } = req.body;
 
@@ -105,7 +107,7 @@ router.post('/email', async (req, res) => {
  * @desc    Xác minh số điện thoại
  * @access  Public
  */
-router.post('/phone', async (req, res) => {
+router.post('/phone', optionalAuth, checkScanLimit, async (req, res) => {
   try {
     const { phone } = req.body;
 
@@ -149,7 +151,7 @@ router.post('/phone', async (req, res) => {
  * @desc    Quét nhanh - tự động nhận diện loại input (URL/email/phone)
  * @access  Public
  */
-router.post('/quick', async (req, res) => {
+router.post('/quick', optionalAuth, checkScanLimit, async (req, res) => {
   try {
     const { input } = req.body;
 
