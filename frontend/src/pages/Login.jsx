@@ -308,6 +308,7 @@ const Login = () => {
             <FacebookLogin
               appId={process.env.REACT_APP_FACEBOOK_APP_ID || "1234567890"}
               autoLoad={false}
+              isMobile={false}
               fields="name,email,picture"
               callback={responseFacebook}
               render={renderProps => (

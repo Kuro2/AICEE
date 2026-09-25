@@ -201,13 +201,12 @@ router.post('/facebook', async (req, res) => {
     const response = await axios.get(`https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`);
     const payload = response.data;
     
-    if (!payload.email) {
-      return res.status(400).json({ success: false, message: 'Tài khoản Facebook chưa liên kết email' });
-    }
+    // Tạo email giả nếu user đăng ký FB bằng số điện thoại
+    const email = payload.email || `${payload.id}@facebook.aicee.com`;
 
     // Tìm hoặc tạo user
     const profile = {
-      email: payload.email,
+      email: email,
       name: payload.name,
       avatar: payload.picture?.data?.url || null,
       provider: 'facebook',
