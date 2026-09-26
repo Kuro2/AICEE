@@ -158,60 +158,63 @@ function getMockResponse(message) {
 // Gửi tin nhắn tới Gemini AI
 async function sendToGemini(message, history = []) {
   if (!GEMINI_API_KEY) {
-    // Fallback: dùng mock response
     return getMockResponse(message);
   }
 
   try {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+    // Sử dụng đúng tên model và cấu hình systemInstruction đúng chuẩn
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      systemInstruction: SYSTEM_PROMPT 
+    });
 
-    // Tạo chat session với lịch sử hợp lệ
+    // Lọc lịch sử hợp lệ và đổi role từ 'ai' thành 'model' nếu có
     const validHistory = history
       .filter(h => h.content && h.content.trim())
       .map(h => ({
-        role: h.role === 'model' ? 'model' : 'user',
-        parts: [{ text: h.content }]
+        role: h.role === 'model' || h.role === 'ai' ? 'model' : 'user',
+        parts: [{ text: h.content.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{200D}\u{FE0F}]/gu, '') }]
       }));
 
     const chat = model.startChat({
       history: validHistory,
       generationConfig: {
-        maxOutputTokens: 800,
+        maxOutputTokens: 1000,
         temperature: 0.6,
       }
     });
 
-    const fullPrompt = `${SYSTEM_PROMPT}\n\nNgười dùng: ${message}`;
-    const result = await chat.sendMessage(fullPrompt);
+    // Loại bỏ emoji khỏi input của user để tránh lỗi
+    const cleanMessage = message.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{200D}\u{FE0F}]/gu, '');
+    
+    // Gửi trực tiếp nội dung người dùng (không gộp SYSTEM_PROMPT vào đây nữa)
+    const result = await chat.sendMessage(cleanMessage);
     let responseText = result.response.text().trim();
 
-    // Strip markdown code blocks nếu có (```json ... ``` hoặc ``` ... ```)
+    // Strip markdown code blocks
     responseText = responseText
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```\s*$/i, '')
       .trim();
 
-    // Nếu AI vẫn trả về JSON wrapper, lấy trường text bên trong
     try {
       if (responseText.startsWith('{')) {
         const parsed = JSON.parse(responseText);
         if (parsed.text) responseText = parsed.text;
       }
     } catch (e) {
-      // Không phải JSON, giữ nguyên
+      // Bỏ qua lỗi parse JSON
     }
 
-    // Phát hiện status từ keywords tiếng Việt
+    // Loại bỏ toàn bộ emoji khỏi câu trả lời của AI
+    responseText = responseText.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{200D}\u{FE0F}]/gu, '').replace(/[^\S\r\n]{2,}/g, ' ').trim();
+
     const lower = responseText.toLowerCase();
     let status = 'info';
-    const dangerWords = ['nguy hiểm', 'lừa đảo', 'giả mạo', 'phishing', 'scam', 'độc hại', 'không nên truy cập', 'không an toàn'];
-    const warningWords = ['cảnh báo', 'cẩn thận', 'đáng ngờ', 'thận trọng', 'suspicious'];
-    const safeWords = ['an toàn', 'tin cậy', 'hợp lệ', 'không có vấn đề', 'uy tín', 'đáng tin'];
-
-    if (dangerWords.some(k => lower.includes(k))) status = 'danger';
-    else if (warningWords.some(k => lower.includes(k))) status = 'warning';
-    else if (safeWords.some(k => lower.includes(k))) status = 'safe';
+    if (lower.startsWith('[an toàn]') || lower.includes('[an toàn]') || lower.includes('an toàn')) status = 'safe';
+    else if (lower.startsWith('[nguy hiểm]') || lower.includes('[nguy hiểm]') || lower.includes('lừa đảo') || lower.includes('nguy hiểm')) status = 'danger';
+    else if (lower.startsWith('[cảnh báo]') || lower.includes('[cảnh báo]') || lower.includes('cảnh báo') || lower.includes('đáng ngờ')) status = 'warning';
 
     return { text: responseText, status, recommendations: [] };
   } catch (error) {
