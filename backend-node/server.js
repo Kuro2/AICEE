@@ -2,9 +2,17 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config();
 const mongoose = require('mongoose');
 const serverless = require('serverless-http');
+
+process.on('uncaughtException', (err) => {
+  console.error('❌ UNCAUGHT EXCEPTION:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ UNHANDLED REJECTION:', reason);
+});
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -48,6 +56,9 @@ app.use(cors({
 // ===== BODY PARSER =====
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ===== STATIC FILES =====
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ===== REQUEST LOGGING =====
 app.use((req, res, next) => {

@@ -40,7 +40,7 @@ const Home = () => {
       border: 'border-cyan-500/30 hover:border-cyan-500/60',
     },
     {
-      title: 'Trí tuệ Nhân tạo Google Gemini',
+      title: 'Trí tuệ Nhân tạo',
       description: 'Phân tích đa phương thức văn bản, mã nguồn HTML và ảnh chụp màn hình để tìm ra những bẫy thao túng tâm lý tinh vi nhất.',
       icon: Sparkles,
       badge: 'Multimodal AI',
@@ -271,7 +271,7 @@ const Home = () => {
                 {/* ── Floating Graphic Icon Badges (Nghiêng sang 2 phía, không chữ) ── */}
                 {/* 1. Shield Check Icon (Top-Right: Nghiêng sang phải +12deg) */}
                 <div className="absolute top-2 -right-2 sm:-right-4 animate-float z-20">
-                  <div 
+                  <div
                     title="Bảo vệ an toàn"
                     className="w-12 sm:w-14 h-12 sm:h-14 rounded-2xl bg-slate-900/90 border border-emerald-500/50 backdrop-blur-xl shadow-[0_0_25px_rgba(16,185,129,0.4)] flex items-center justify-center text-emerald-400 transform rotate-12 hover:rotate-3 hover:scale-110 transition-all duration-300 cursor-pointer"
                   >
@@ -281,7 +281,7 @@ const Home = () => {
 
                 {/* 2. Sparkles AI Icon (Bottom-Left: Nghiêng sang trái -12deg) */}
                 <div className="absolute bottom-2 -left-2 sm:-left-4 animate-float-delayed z-20">
-                  <div 
+                  <div
                     title="Trí tuệ nhân tạo AI"
                     className="w-12 sm:w-14 h-12 sm:h-14 rounded-2xl bg-slate-900/90 border border-cyan-500/50 backdrop-blur-xl shadow-[0_0_25px_rgba(6,182,212,0.4)] flex items-center justify-center text-cyan-400 transform -rotate-12 hover:-rotate-3 hover:scale-110 transition-all duration-300 cursor-pointer"
                   >
@@ -291,7 +291,7 @@ const Home = () => {
 
                 {/* 3. Cyber Lock Icon (Bottom-Right: Nghiêng sang phải +12deg) */}
                 <div className="absolute bottom-4 -right-1 sm:right-1 animate-float-slow z-20">
-                  <div 
+                  <div
                     title="Mã hóa bảo mật"
                     className="w-11 sm:w-12 h-11 sm:h-12 rounded-2xl bg-slate-900/90 border border-purple-500/50 backdrop-blur-xl shadow-[0_0_25px_rgba(168,85,247,0.4)] flex items-center justify-center text-purple-300 transform rotate-12 hover:rotate-3 hover:scale-110 transition-all duration-300 cursor-pointer"
                   >
@@ -301,7 +301,7 @@ const Home = () => {
 
                 {/* 4. Mini Guard Shield Icon (Top-Left: Nghiêng sang trái -12deg) */}
                 <div className="absolute top-6 -left-1 sm:left-2 animate-float z-20">
-                  <div 
+                  <div
                     title="Khiên phòng vệ mạng"
                     className="w-10 sm:w-11 h-10 sm:h-11 rounded-2xl bg-slate-900/90 border border-blue-500/40 backdrop-blur-xl shadow-[0_0_20px_rgba(59,130,246,0.35)] flex items-center justify-center text-blue-400 transform -rotate-12 hover:-rotate-3 hover:scale-110 transition-all duration-300 cursor-pointer"
                   >

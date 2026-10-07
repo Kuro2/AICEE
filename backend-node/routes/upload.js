@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { analyzeFile } = require('../services/aiService');
 const { optionalAuth } = require('../middleware/auth');
+const ChatMessage = require('../models/ChatMessage');
 
 // Cấu hình multer - lưu file vào thư mục uploads
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
@@ -51,7 +52,7 @@ const upload = multer({
 
 /**
  * @route   POST /api/upload
- * @desc    Upload file và phân tích bằng AI
+ * @desc    Upload file, phân tích bằng AI và lưu vào lịch sử Chat
  * @access  Public
  */
 router.post('/', optionalAuth, upload.array('files', 5), async (req, res) => {
@@ -63,22 +64,36 @@ router.post('/', optionalAuth, upload.array('files', 5), async (req, res) => {
       });
     }
 
+    const sid = req.body.sessionId || (req.user ? `user-${req.user.id}` : `guest-${Date.now()}`);
+    const userId = req.user ? req.user.id : null;
+    const userCustomText = req.body.message && req.body.message.trim() ? req.body.message.trim() : '';
+
+    let clientPreviews = [];
+    try {
+      if (req.body.previews) {
+        clientPreviews = JSON.parse(req.body.previews);
+      }
+    } catch (e) {}
+
     // Phân tích từng file
     const analyses = await Promise.all(
-      req.files.map(async (file) => {
+      req.files.map(async (file, idx) => {
         const analysis = await analyzeFile(file.originalname, file.mimetype, null);
 
-        // Xóa file sau khi phân tích (không lưu lại)
-        try {
-          fs.unlinkSync(file.path);
-        } catch (e) {
-          // Bỏ qua lỗi xóa file
+        // Lưu preview: ưu tiên dataUrl từ client, hoặc base64 tự sinh, hoặc static url
+        let preview = clientPreviews[idx] || `/uploads/${file.filename}`;
+        if (!clientPreviews[idx] && file.mimetype.startsWith('image/') && file.size <= 500 * 1024) {
+          try {
+            const b64 = fs.readFileSync(file.path, 'base64');
+            preview = `data:${file.mimetype};base64,${b64}`;
+          } catch (e) {}
         }
 
         return {
           fileName: file.originalname,
           fileSize: file.size,
           fileType: file.mimetype,
+          preview,
           ...analysis
         };
       })
@@ -87,14 +102,70 @@ router.post('/', optionalAuth, upload.array('files', 5), async (req, res) => {
     // Tổng hợp kết quả
     const overallStatus = analyses.some(a => a.status === 'danger') ? 'danger' :
                           analyses.some(a => a.status === 'warning') ? 'warning' : 'safe';
+    const combinedText = analyses.map(a => `**${a.fileName}**:\n${a.text}`).join('\n\n---\n\n');
+    const allRecs = [...new Set(analyses.flatMap(a => a.recommendations || []))];
+
+    // Chuẩn bị metadata file
+    const filesMeta = analyses.map(a => ({
+      name: a.fileName,
+      type: a.fileType,
+      size: a.fileSize,
+      preview: a.preview
+    }));
+
+    const queryTitle = userCustomText || (
+      req.files.length === 1 
+        ? `Phân tích tệp: ${req.files[0].originalname}` 
+        : `Phân tích ${req.files.length} tệp tin: ${req.files.map(f => f.originalname).join(', ')}`
+    );
+
+    let userMsgDoc = null;
+    let aiMsgDoc = null;
+
+    try {
+      userMsgDoc = await ChatMessage.create({
+        userId,
+        sessionId: sid,
+        type: 'user',
+        text: queryTitle,
+        files: filesMeta
+      });
+
+      aiMsgDoc = await ChatMessage.create({
+        userId,
+        sessionId: sid,
+        type: 'ai',
+        text: combinedText,
+        status: overallStatus,
+        recommendations: allRecs
+      });
+    } catch (saveErr) {
+      console.warn('Lỗi lưu tệp vào ChatMessage MongoDB:', saveErr.message);
+    }
 
     res.json({
       success: true,
       data: {
         analyses,
         overallStatus,
+        recommendations: allRecs,
         fileCount: req.files.length,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        userMessage: userMsgDoc ? {
+          id: userMsgDoc._id.toString(),
+          type: 'user',
+          text: userMsgDoc.text,
+          files: userMsgDoc.files,
+          timestamp: userMsgDoc.createdAt
+        } : null,
+        aiMessage: aiMsgDoc ? {
+          id: aiMsgDoc._id.toString(),
+          type: 'ai',
+          text: aiMsgDoc.text,
+          status: aiMsgDoc.status,
+          recommendations: aiMsgDoc.recommendations,
+          timestamp: aiMsgDoc.createdAt
+        } : null
       }
     });
   } catch (error) {

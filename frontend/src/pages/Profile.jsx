@@ -308,7 +308,7 @@ const Profile = () => {
                   </div>
 
                   <Link 
-                    to="/chatbox"
+                    to="/ai-history"
                     className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/10 rounded-2xl hover:border-cyan-500/40 hover:bg-white/[0.04] transition"
                   >
                     <div className="flex items-center space-x-3">

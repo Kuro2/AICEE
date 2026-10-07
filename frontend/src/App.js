@@ -18,6 +18,7 @@ import Profile from '@/pages/Profile';
 import QuizFake from '@/pages/QuizFake';
 import QuizEmail from '@/pages/QuizEmail';
 import Pricing from '@/pages/Pricing';
+import AiHistory from '@/pages/AiHistory';
 
 // Admin Pages
 import AdminLayout from '@/components/AdminLayout';
@@ -40,6 +41,7 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/chatbox" element={<ChatboxAI />} />
+            <Route path="/ai-history" element={<AiHistory />} />
             <Route path="/resources" element={<Resources />} />
             <Route path="/resources/unsafe" element={<UnsafeList />} />
             <Route path="/resources/safe" element={<SafeList />} />

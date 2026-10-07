@@ -137,7 +137,20 @@ export const chatAPI = {
   getHistory: (sessionId) => request('GET', `/chat/history/${sessionId}`),
 
   /**
-   * Xóa lịch sử chat
+   * Lấy danh sách dòng thời gian Nhật ký tư vấn AI kèm thống kê
+   */
+  getFeed: (sessionId = null) => {
+    const q = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : '';
+    return request('GET', `/chat/feed${q}`);
+  },
+
+  /**
+   * Xóa một mục trong nhật ký tư vấn
+   */
+  deleteItem: (id) => request('DELETE', `/chat/message/${id}`),
+
+  /**
+   * Xóa toàn bộ lịch sử chat
    */
   clearHistory: (sessionId) =>
     request('DELETE', `/chat/history/${sessionId}`),
@@ -185,17 +198,26 @@ export const newsAPI = {
 
 export const uploadAPI = {
   /**
-   * Upload và phân tích files
+   * Upload và phân tích files kèm lưu lịch sử chat
    * @param {FileList|File[]} files
+   * @param {string|null} sessionId
+   * @param {string} message
+   * @param {Array} previews
    */
-  analyze: async (files) => {
+  analyze: async (files, sessionId = null, message = '', previews = []) => {
     const formData = new FormData();
     Array.from(files).forEach((file) => formData.append('files', file));
+    if (sessionId) formData.append('sessionId', sessionId);
+    if (message) formData.append('message', message);
+    if (previews && previews.length > 0) {
+      formData.append('previews', JSON.stringify(previews));
+    }
 
+    const token = getToken();
     const res = await fetch(`${API_BASE}/upload`, {
       method: 'POST',
       headers: {
-        ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: formData,
     });

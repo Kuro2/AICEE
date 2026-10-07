@@ -4,23 +4,51 @@ import {
   Shield, Send, User, Bot, Home, Menu, X, Sparkles,
   AlertCircle, CheckCircle, Info, Paperclip, File, Trash2,
 } from 'lucide-react';
-import { chatAPI, uploadAPI } from '@/services/api';
+import { chatAPI, uploadAPI, authAPI } from '@/services/api';
 
-// Tạo session ID duy nhất cho mỗi tab
-const SESSION_ID = `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const DEFAULT_WELCOME_MESSAGE = {
+  id: 'welcome',
+  type: 'ai',
+  text: 'Xin chào! Tôi là trợ lý AI của **AICEE** 🛡️\n\nTôi có thể giúp bạn:\n🔗 Kiểm tra độ an toàn website\n📧 Phân tích email lừa đảo\n📱 Xác minh số điện thoại\n🛡️ Tư vấn an ninh mạng\n📁 Phân tích file\n\nHãy gửi nội dung cần kiểm tra cho tôi!',
+  status: 'info',
+  timestamp: new Date(),
+};
+
+// Lấy hoặc tạo session ID bền vững (theo người dùng hoặc guest)
+const getSessionId = () => {
+  const currentUser = authAPI.getCurrentUser();
+  if (currentUser && (currentUser.id || currentUser._id)) {
+    return `user-${currentUser.id || currentUser._id}`;
+  }
+  let guestSid = localStorage.getItem('aicee_guest_session_id');
+  if (!guestSid) {
+    guestSid = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    localStorage.setItem('aicee_guest_session_id', guestSid);
+  }
+  return guestSid;
+};
 
 const ChatboxAI = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: 'ai',
-      text: 'Xin chào! Tôi là trợ lý AI của **AICEE** 🛡️\n\nTôi có thể giúp bạn:\n🔗 Kiểm tra độ an toàn website\n📧 Phân tích email lừa đảo\n📱 Xác minh số điện thoại\n🛡️ Tư vấn an ninh mạng\n📁 Phân tích file\n\nHãy gửi nội dung cần kiểm tra cho tôi!',
-      status: 'info',
-      timestamp: new Date(),
-    },
-  ]);
+  const [sessionId] = useState(() => getSessionId());
+  const [messages, setMessages] = useState(() => {
+    const saved = localStorage.getItem('aicee_chat_history_' + getSessionId());
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((m) => ({
+            ...m,
+            timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+          }));
+        }
+      } catch (e) {
+        console.error('Lỗi đọc cache chat:', e);
+      }
+    }
+    return [DEFAULT_WELCOME_MESSAGE];
+  });
   const [inputText, setInputText] = useState(location.state?.initialPrompt || '');
   const [isTyping, setIsTyping] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -29,6 +57,49 @@ const ChatboxAI = () => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
+
+  const formatTime = (ts) => {
+    if (!ts) return '';
+    try {
+      const d = ts instanceof Date ? ts : new Date(ts);
+      return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '';
+    }
+  };
+
+  // Tải lịch sử chat từ Backend (MongoDB)
+  useEffect(() => {
+    let isMounted = true;
+    const fetchHistory = async () => {
+      try {
+        const res = await chatAPI.getHistory(sessionId);
+        if (isMounted && res.success && res.data && Array.isArray(res.data.history) && res.data.history.length > 0) {
+          const formatted = res.data.history.map((m) => ({
+            ...m,
+            timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+          }));
+          setMessages(formatted);
+          localStorage.setItem('aicee_chat_history_' + sessionId, JSON.stringify(formatted));
+        }
+      } catch (err) {
+        console.warn('Chưa thể tải lịch sử từ máy chủ, dùng cache máy khách:', err.message);
+      }
+    };
+
+    fetchHistory();
+    return () => { isMounted = false; };
+  }, [sessionId]);
+
+  // Tự động lưu trữ lịch sử tin nhắn vào localStorage khi có thay đổi
+  useEffect(() => {
+    if (messages && messages.length > 0 && !(messages.length === 1 && messages[0].id === 'welcome')) {
+      localStorage.setItem('aicee_chat_history_' + sessionId, JSON.stringify(messages));
+    }
+  }, [messages, sessionId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -46,15 +117,58 @@ const ChatboxAI = () => {
     }
   }, [inputText]);
 
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files);
-    const fileData = files.map((file) => ({
-      file,
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
-    }));
+  const readFilePreview = (file) => {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith('image/')) {
+        resolve(null);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 800;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.onerror = () => resolve(e.target.result);
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileSelect = async (e) => {
+    const rawFiles = Array.from(e.target.files);
+    if (rawFiles.length === 0) return;
+
+    const fileDataPromises = rawFiles.map(async (file) => {
+      const preview = await readFilePreview(file);
+      return {
+        file,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        preview,
+      };
+    });
+
+    const fileData = await Promise.all(fileDataPromises);
     setSelectedFiles((prev) => [...prev, ...fileData]);
     // Reset input để có thể chọn lại cùng file
     e.target.value = '';
@@ -63,7 +177,6 @@ const ChatboxAI = () => {
   const removeFile = (index) => {
     setSelectedFiles((prev) => {
       const next = [...prev];
-      if (next[index].preview) URL.revokeObjectURL(next[index].preview);
       next.splice(index, 1);
       return next;
     });
@@ -74,15 +187,16 @@ const ChatboxAI = () => {
     setError(null);
 
     const userMessage = {
-      id: messages.length + 1,
+      id: Date.now(),
       type: 'user',
       text: inputText,
-      files: selectedFiles.length > 0 ? [...selectedFiles] : null,
+      files: selectedFiles.length > 0 ? selectedFiles.map(f => ({ name: f.name, type: f.type, size: f.size, preview: f.preview, file: f.file })) : null,
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
     const currentInput = inputText;
+    const currentFiles = [...selectedFiles];
     setInputText('');
     setSelectedFiles([]);
     setIsTyping(true);
@@ -90,26 +204,31 @@ const ChatboxAI = () => {
     try {
       let aiResponse;
 
-      if (userMessage.files && userMessage.files.length > 0) {
-        // Upload files và phân tích
-        const fileList = userMessage.files.map((f) => f.file);
-        const result = await uploadAPI.analyze(fileList);
+      if (currentFiles && currentFiles.length > 0) {
+        // Upload files và phân tích kèm sessionId để lưu vĩnh viễn vào MongoDB
+        const fileList = currentFiles.map((f) => f.file);
+        const previews = currentFiles.map((f) => f.preview || '');
+        const result = await uploadAPI.analyze(fileList, sessionId, currentInput, previews);
 
         if (result.success) {
           const combined = result.data.analyses
             .map((a) => `**${a.fileName}**:\n${a.text}`)
             .join('\n\n---\n\n');
           aiResponse = {
+            id: result.data.aiMessage?.id,
             text: combined,
             status: result.data.overallStatus,
-            recommendations: [],
+            recommendations: result.data.recommendations || [],
           };
+          if (result.data.userMessage?.id) {
+            userMessage.id = result.data.userMessage.id;
+          }
         } else {
-          throw new Error(result.message);
+          throw new Error(result.message || 'Lỗi phân tích file');
         }
       } else {
         // Gửi text tới AI
-        const result = await chatAPI.send(currentInput, SESSION_ID);
+        const result = await chatAPI.send(currentInput, sessionId);
         if (result.success) {
           aiResponse = result.data;
         } else {
@@ -118,14 +237,17 @@ const ChatboxAI = () => {
       }
 
       const aiMessage = {
-        id: messages.length + 2,
+        id: aiResponse.id || (Date.now() + 1),
         type: 'ai',
         text: aiResponse.message || aiResponse.text || '',
         status: aiResponse.status || 'info',
         recommendations: aiResponse.recommendations || [],
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, aiMessage]);
+      setMessages((prev) => {
+        const updated = prev.map((m) => (m.id === userMessage.id ? { ...userMessage } : m));
+        return [...updated, aiMessage];
+      });
     } catch (err) {
       if (err.data && err.data.isLimitReached) {
         setMessages((prev) => [
@@ -177,10 +299,11 @@ const ChatboxAI = () => {
   };
 
   const clearChat = () => {
-    chatAPI.clearHistory(SESSION_ID).catch(() => {});
+    chatAPI.clearHistory(sessionId).catch(() => {});
+    localStorage.removeItem('aicee_chat_history_' + sessionId);
     setMessages([
       {
-        id: 1,
+        id: 'welcome-reset',
         type: 'ai',
         text: 'Cuộc trò chuyện đã được làm mới. Tôi có thể giúp gì cho bạn? 🛡️',
         status: 'info',
@@ -394,14 +517,21 @@ const ChatboxAI = () => {
                     {/* File attachments */}
                     {message.files && message.files.length > 0 && (
                       <div className="mb-3 space-y-2">
-                        {message.files.map((fileData, idx) =>
-                          fileData.preview ? (
-                            <img
-                              key={idx}
-                              src={fileData.preview}
-                              alt={fileData.name}
-                              className="max-w-xs rounded-lg border border-white/20"
-                            />
+                        {message.files.map((fileData, idx) => {
+                          const imgSrc = fileData.preview
+                            ? (fileData.preview.startsWith('http') || fileData.preview.startsWith('data:')
+                                ? fileData.preview
+                                : `http://localhost:5000${fileData.preview}`)
+                            : null;
+                          return imgSrc ? (
+                            <div key={idx} className="space-y-1">
+                              <img
+                                src={imgSrc}
+                                alt={fileData.name}
+                                className="max-w-xs max-h-64 rounded-xl border border-white/20 object-contain bg-black/40 shadow-lg"
+                              />
+                              <p className="text-[11px] opacity-75 truncate max-w-xs">{fileData.name}</p>
+                            </div>
                           ) : (
                             <div
                               key={idx}
@@ -413,8 +543,8 @@ const ChatboxAI = () => {
                                 ({(fileData.size / 1024).toFixed(1)} KB)
                               </span>
                             </div>
-                          )
-                        )}
+                          );
+                        })}
                       </div>
                     )}
 
@@ -453,10 +583,7 @@ const ChatboxAI = () => {
                     )}
 
                     <span className="text-xs opacity-50 mt-2 block">
-                      {message.timestamp.toLocaleTimeString('vi-VN', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatTime(message.timestamp)}
                     </span>
                   </div>
                 </div>
