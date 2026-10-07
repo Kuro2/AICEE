@@ -149,56 +149,68 @@ app.use((err, req, res, next) => {
 });
 
 // ===== START SERVER / EXPORT FOR NETLIFY =====
-// Nếu có MONGODB_URI thì kết nối, nếu không thì cảnh báo
+// Nếu có MONGODB_URI thì kết nối kèm cơ chế tự động thử lại (Retry)
 if (process.env.MONGODB_URI) {
-  mongoose.connect(process.env.MONGODB_URI)
-    .then(async () => {
-      console.log('✅ MongoDB Connected');
-      
-      // Seed Admin user
-      const { UserModel } = require('./models/User');
-      const bcrypt = require('bcryptjs');
-      const adminCount = await UserModel.countDocuments({ role: 'admin' });
-      if (adminCount === 0) {
-        console.log('🔄 Đang khởi tạo tài khoản Admin mặc định...');
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash('admin123', salt);
-        await UserModel.create({
-          email: 'admin@aicee.com',
-          name: 'Quản trị viên',
-          password: hashedPassword,
-          role: 'admin'
+  const connectDBWithRetry = async (retries = 5) => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        await mongoose.connect(process.env.MONGODB_URI, {
+          serverSelectionTimeoutMS: 5000,
         });
-        console.log('✅ Đã tạo tài khoản Admin (admin@aicee.com / admin123)');
-      }
+        console.log('✅ MongoDB Connected');
 
-      // Seed dữ liệu mẫu cho resources nếu chưa có
-      const Resource = require('./models/Resource');
-      const count = await Resource.countDocuments();
-      if (count === 0) {
-        console.log('🔄 Đang khởi tạo dữ liệu mẫu cho danh sách an toàn/không an toàn...');
-        const initialData = [
-          // Safe List
-          { isSafe: true, type: 'Tổ chức', name: 'Cổng Dịch vụ công Quốc gia', address: 'dichvucong.gov.vn', description: 'Chính phủ' },
-          { isSafe: true, type: 'Tổ chức', name: 'Bộ Thông tin và Truyền thông', address: 'mic.gov.vn', description: 'Chính phủ' },
-          { isSafe: true, type: 'Tổ chức', name: 'Ngân hàng Vietcombank', address: 'vietcombank.com.vn', description: 'Tài chính' },
-          { isSafe: true, type: 'Tổ chức', name: 'Tổng cục Thuế', address: 'gdt.gov.vn', description: 'Chính phủ' },
-          { isSafe: true, type: 'Tổ chức', name: 'Tập đoàn Điện lực Việt Nam', address: 'evn.com.vn', description: 'Dịch vụ công' },
-          { isSafe: true, type: 'Tổ chức', name: 'Công ty Cổ phần VNG', address: 'vng.com.vn', description: 'Công nghệ' },
-          
-          // Unsafe List
-          { isSafe: false, type: 'Website', address: 'kiemtiennhanh24h.xyz', description: 'Lừa đảo đầu tư, Ponzi' },
-          { isSafe: false, type: 'Email', address: 'support-bink@gmail.com', description: 'Giả danh ngân hàng (Phishing)' },
-          { isSafe: false, type: 'SĐT', address: '0987.xxx.999', description: 'Giả mạo công an yêu cầu chuyển tiền' },
-          { isSafe: false, type: 'Website', address: 'nhanqua-shopee.net', description: 'Lừa đảo lấy cắp tài khoản' },
-          { isSafe: false, type: 'Email', address: 'trungthuong-apple@yahoo.com', description: 'Lừa đảo trúng thưởng' },
-          { isSafe: false, type: 'SĐT', address: '0901.xxx.222', description: 'Quấy rối, đòi nợ thuê trái phép' }
-        ];
-        await Resource.insertMany(initialData);
-        console.log('✅ Đã nạp dữ liệu mẫu cho danh sách thành công!');
+        // Seed Admin user
+        const { UserModel } = require('./models/User');
+        const bcrypt = require('bcryptjs');
+        const adminCount = await UserModel.countDocuments({ role: 'admin' });
+        if (adminCount === 0) {
+          console.log('🔄 Đang khởi tạo tài khoản Admin mặc định...');
+          const salt = await bcrypt.genSalt(10);
+          const hashedPassword = await bcrypt.hash('admin123', salt);
+          await UserModel.create({
+            email: 'admin@aicee.com',
+            name: 'Quản trị viên',
+            password: hashedPassword,
+            role: 'admin'
+          });
+          console.log('✅ Đã tạo tài khoản Admin (admin@aicee.com / admin123)');
+        }
+
+        // Seed dữ liệu mẫu cho resources nếu chưa có
+        const Resource = require('./models/Resource');
+        const count = await Resource.countDocuments();
+        if (count === 0) {
+          console.log('🔄 Đang khởi tạo dữ liệu mẫu cho danh sách an toàn/không an toàn...');
+          const initialData = [
+            // Safe List
+            { isSafe: true, type: 'Tổ chức', name: 'Cổng Dịch vụ công Quốc gia', address: 'dichvucong.gov.vn', description: 'Chính phủ' },
+            { isSafe: true, type: 'Tổ chức', name: 'Bộ Thông tin và Truyền thông', address: 'mic.gov.vn', description: 'Chính phủ' },
+            { isSafe: true, type: 'Tổ chức', name: 'Ngân hàng Vietcombank', address: 'vietcombank.com.vn', description: 'Tài chính' },
+            { isSafe: true, type: 'Tổ chức', name: 'Tổng cục Thuế', address: 'gdt.gov.vn', description: 'Chính phủ' },
+            { isSafe: true, type: 'Tổ chức', name: 'Tập đoàn Điện lực Việt Nam', address: 'evn.com.vn', description: 'Dịch vụ công' },
+            { isSafe: true, type: 'Tổ chức', name: 'Công ty Cổ phần VNG', address: 'vng.com.vn', description: 'Công nghệ' },
+            
+            // Unsafe List
+            { isSafe: false, type: 'Website', address: 'kiemtiennhanh24h.xyz', description: 'Lừa đảo đầu tư, Ponzi' },
+            { isSafe: false, type: 'Email', address: 'support-bink@gmail.com', description: 'Giả danh ngân hàng (Phishing)' },
+            { isSafe: false, type: 'SĐT', address: '0987.xxx.999', description: 'Giả mạo công an yêu cầu chuyển tiền' },
+            { isSafe: false, type: 'Website', address: 'nhanqua-shopee.net', description: 'Lừa đảo lấy cắp tài khoản' },
+            { isSafe: false, type: 'Email', address: 'trungthuong-apple@yahoo.com', description: 'Lừa đảo trúng thưởng' },
+            { isSafe: false, type: 'SĐT', address: '0901.xxx.222', description: 'Quấy rối, đòi nợ thuê trái phép' }
+          ];
+          await Resource.insertMany(initialData);
+          console.log('✅ Đã nạp dữ liệu mẫu cho danh sách thành công!');
+        }
+        return;
+      } catch (err) {
+        console.error(`❌ MongoDB Attempt ${attempt}/${retries} Error:`, err.message);
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 1500));
+        }
       }
-    })
-    .catch(err => console.error('❌ MongoDB Connection Error:', err));
+    }
+  };
+  connectDBWithRetry();
 } else {
   console.log('⚠️  Chưa cấu hình MONGODB_URI. Server sẽ chạy nhưng không lưu được dữ liệu!');
 }

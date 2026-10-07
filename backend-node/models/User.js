@@ -28,6 +28,11 @@ function formatUser(userDoc) {
   obj.id = obj._id ? obj._id.toString() : obj.id;
   delete obj._id;
   delete obj.__v;
+  // Cung cấp cờ hasPassword và socialProvider để frontend hiển thị đúng UX
+  obj.hasPassword = !!obj.password;
+  obj.isSocialAccount = !!(obj.googleId || obj.facebookId);
+  obj.socialProvider = obj.googleId ? 'Google' : (obj.facebookId ? 'Facebook' : null);
+  delete obj.password;
   // Mặc định gói Free và số lượt quét nếu chưa có trong DB
   if (!obj.plan) obj.plan = 'free';
   if (obj.scanCount === undefined || obj.scanCount === null) obj.scanCount = 0;

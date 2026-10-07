@@ -93,6 +93,26 @@ export const authAPI = {
   getMe: () => request('GET', '/auth/me'),
 
   /**
+   * Cập nhật thông tin profile
+   * @param {Object} data - { name, avatar }
+   */
+  updateProfile: async (data) => {
+    const res = await request('PUT', '/auth/profile', data);
+    if (res.success && res.data?.user) {
+      const currentUser = authAPI.getCurrentUser() || {};
+      const updated = { ...currentUser, ...res.data.user };
+      localStorage.setItem('aicee_user', JSON.stringify(updated));
+    }
+    return res;
+  },
+
+  /**
+   * Đổi mật khẩu
+   * @param {Object} data - { currentPassword, newPassword }
+   */
+  changePassword: (data) => request('PUT', '/auth/change-password', data),
+
+  /**
    * Đăng xuất, xóa token
    */
   logout: () => {
