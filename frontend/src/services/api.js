@@ -247,3 +247,10 @@ export const subscriptionAPI = {
   getSubscription: () => request('GET', '/subscription'),
   upgradePlan: (plan) => request('POST', '/subscription/upgrade', { plan })
 };
+
+// ── Payment API ──────────────────────────────────────────────
+export const paymentAPI = {
+  create: async (planType, method = 'vnpay') => {
+    return request('POST', '/payment/create', { planType, method });
+  }
+};

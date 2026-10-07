@@ -59,11 +59,11 @@ const AdminUsers = () => {
     <div>
       <h1 className="text-3xl font-bold text-white mb-8">Quản lý Người dùng</h1>
       
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-800/50 text-gray-400 text-sm border-b border-slate-700">
+              <tr className="bg-white/5 backdrop-blur-md text-gray-400 text-sm border-b border-white/10">
                 <th className="p-4 font-medium">Người dùng</th>
                 <th className="p-4 font-medium">Email</th>
                 <th className="p-4 font-medium">Quyền</th>
@@ -73,19 +73,19 @@ const AdminUsers = () => {
             </thead>
             <tbody className="divide-y divide-slate-800">
               {users.map(user => (
-                <tr key={user.id} className="hover:bg-slate-800/20 transition-colors">
+                <tr key={user.id} className="hover:bg-white/10/20 transition-colors">
                   <td className="p-4 flex items-center gap-3">
                     <img 
                       src={user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=0D8ABC&color=fff`} 
                       alt="" 
-                      className="w-10 h-10 rounded-full bg-slate-800" 
+                      className="w-10 h-10 rounded-full bg-white/10" 
                     />
                     <span className="text-white font-medium">{user.name}</span>
                   </td>
                   <td className="p-4 text-gray-400">{user.email}</td>
                   <td className="p-4">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      user.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-slate-800 text-gray-400 border border-slate-700'
+                      user.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-white/10 text-gray-400 border border-white/10'
                     }`}>
                       {user.role === 'admin' ? 'Admin' : 'User'}
                     </span>
@@ -97,14 +97,14 @@ const AdminUsers = () => {
                     <div className="flex justify-end gap-2">
                       <button 
                         onClick={() => handleRoleChange(user.id, user.role)}
-                        className="p-2 bg-slate-800 hover:bg-cyan-500/20 text-gray-400 hover:text-cyan-400 rounded-lg transition-colors"
+                        className="p-2 bg-white/10 hover:bg-cyan-500/20 text-gray-400 hover:text-cyan-400 rounded-lg transition-colors"
                         title={user.role === 'admin' ? "Hạ xuống User" : "Nâng lên Admin"}
                       >
                         {user.role === 'admin' ? <Shield className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
                       </button>
                       <button 
                         onClick={() => handleDelete(user.id)}
-                        className="p-2 bg-slate-800 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-lg transition-colors"
+                        className="p-2 bg-white/10 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-lg transition-colors"
                         title="Xóa tài khoản"
                       >
                         <Trash2 className="w-4 h-4" />

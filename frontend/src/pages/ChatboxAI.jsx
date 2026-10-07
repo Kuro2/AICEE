@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Shield, Send, User, Bot, Home, Menu, X, Sparkles,
   AlertCircle, CheckCircle, Info, Paperclip, File, Trash2,
@@ -11,6 +11,7 @@ const SESSION_ID = `session-${Date.now()}-${Math.random().toString(36).slice(2)}
 
 const ChatboxAI = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -20,7 +21,7 @@ const ChatboxAI = () => {
       timestamp: new Date(),
     },
   ]);
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState(location.state?.initialPrompt || '');
   const [isTyping, setIsTyping] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -210,7 +211,7 @@ const ChatboxAI = () => {
       case 'safe': return 'border-green-500/30 bg-green-500/5';
       case 'warning': return 'border-yellow-500/30 bg-yellow-500/5';
       case 'danger': return 'border-red-500/30 bg-red-500/5';
-      default: return 'border-slate-700 bg-slate-800';
+      default: return 'border-white/10 bg-white/10';
     }
   };
 
@@ -237,46 +238,54 @@ const ChatboxAI = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950">
+    <div className="h-screen flex flex-col bg-[#050505] selection:bg-cyan-500/30 relative overflow-hidden">
       {/* ── Header ── */}
-      <header className="bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 border-b border-blue-700/30 backdrop-blur-sm flex-shrink-0">
-        <div className="container mx-auto px-4 py-3">
+      <header className="bg-slate-950/80 border-b border-white/10 backdrop-blur-2xl flex-shrink-0 z-20">
+        <div className="container mx-auto px-4 py-2.5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="md:hidden text-white p-1 rounded"
               >
-                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
 
-              <div className="flex items-center space-x-3">
-                <img src="/logo-aicee.png" alt="AICEE" className="w-16 h-16 object-contain" />
+              <Link to="/" className="flex items-center space-x-2.5 group">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-cyan-500/30 blur-md rounded-full group-hover:bg-cyan-500/50 transition-colors" />
+                  <img src="/logo-aicee.png" alt="AICEE" className="w-9 h-9 object-contain relative z-10" />
+                </div>
                 <div>
-                  <h1 className="text-lg font-bold text-white">AICEE AI Assistant</h1>
-                  <div className="flex items-center space-x-2">
-                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                    <p className="text-xs text-gray-400">Trợ lý AI đang hoạt động</p>
+                  <h1 className="text-sm sm:text-base font-bold text-white flex items-center gap-1.5">
+                    AICEE AI Assistant
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                      Gemini 1.5
+                    </span>
+                  </h1>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                    <p className="text-[11px] text-gray-400">Trực tuyến 24/7</p>
                   </div>
                 </div>
-              </div>
+              </Link>
             </div>
 
             <div className="flex items-center space-x-2">
               <button
                 onClick={clearChat}
-                className="flex items-center space-x-1 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-gray-400 hover:text-white rounded-lg transition-all text-sm"
-                title="Xóa lịch sử chat"
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white rounded-xl transition-all text-xs font-semibold"
+                title="Làm mới cuộc trò chuyện"
               >
-                <Trash2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Xóa chat</span>
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Làm mới</span>
               </button>
               <button
                 onClick={() => navigate('/')}
-                className="flex items-center space-x-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-all"
+                className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 border border-cyan-500/30 text-cyan-300 rounded-xl transition-all text-xs font-semibold"
                 data-testid="chatbox-home-btn"
               >
-                <Home className="w-4 h-4" />
+                <Home className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Trang chủ</span>
               </button>
             </div>
@@ -301,7 +310,7 @@ const ChatboxAI = () => {
         <aside
           className={`${
             isMobileMenuOpen ? 'block' : 'hidden'
-          } md:block w-full md:w-60 bg-slate-900/50 border-r border-slate-800 p-4 overflow-y-auto flex-shrink-0`}
+          } md:block w-full md:w-60 bg-white/5 backdrop-blur-md border-r border-white/10 p-4 overflow-y-auto flex-shrink-0`}
         >
           <h3 className="text-white font-semibold mb-4 flex items-center space-x-2 text-sm">
             <Sparkles className="w-4 h-4 text-cyan-400" />
@@ -316,7 +325,7 @@ const ChatboxAI = () => {
                   setIsMobileMenuOpen(false);
                   textareaRef.current?.focus();
                 }}
-                className="w-full text-left px-3 py-2.5 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/40 rounded-lg text-gray-300 transition-all flex items-center space-x-2 group text-sm"
+                className="w-full text-left px-3 py-2.5 bg-white/5 backdrop-blur-md hover:bg-white/10 border border-white/10 hover:border-cyan-500/40 rounded-lg text-gray-300 transition-all flex items-center space-x-2 group text-sm"
               >
                 <span className="text-lg flex-shrink-0">{action.icon}</span>
                 <span className="group-hover:text-cyan-400 transition-colors leading-tight">{action.text}</span>
@@ -374,7 +383,7 @@ const ChatboxAI = () => {
                   >
                     {/* Status badge — chỉ cho AI message có status */}
                     {message.type === 'ai' && message.status && message.status !== 'info' && (
-                      <div className="flex items-center space-x-2 mb-2 pb-2 border-b border-slate-700/50">
+                      <div className="flex items-center space-x-2 mb-2 pb-2 border-b border-white/10/50">
                         {getStatusIcon(message.status)}
                         <span className="text-xs font-bold uppercase tracking-wider">
                           {getStatusLabel(message.status)}
@@ -418,7 +427,7 @@ const ChatboxAI = () => {
 
                     {/* Recommendations */}
                     {message.recommendations && message.recommendations.length > 0 && (
-                      <div className="mt-3 pt-2 border-t border-slate-700/50">
+                      <div className="mt-3 pt-2 border-t border-white/10/50">
                         <p className="text-xs text-gray-400 font-semibold mb-1.5">💡 Khuyến nghị:</p>
                         <ul className="space-y-1">
                           {message.recommendations.map((r, i) => (
@@ -461,7 +470,7 @@ const ChatboxAI = () => {
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
                     <Bot className="w-4 h-4 text-white" />
                   </div>
-                  <div className="px-4 py-3 bg-slate-800 rounded-2xl border border-slate-700">
+                  <div className="px-4 py-3 bg-white/10 rounded-2xl border border-white/10">
                     <div className="flex space-x-1.5 items-center h-4">
                       <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" />
                       <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce [animation-delay:0.15s]" />
@@ -475,7 +484,7 @@ const ChatboxAI = () => {
           </div>
 
           {/* ── Input Area ── */}
-          <div className="border-t border-slate-800 bg-slate-900/70 p-4 flex-shrink-0">
+          <div className="border-t border-white/10 bg-white/5/70 p-4 flex-shrink-0">
             <div className="max-w-4xl mx-auto">
               {/* File Preview */}
               {selectedFiles.length > 0 && (
@@ -487,7 +496,7 @@ const ChatboxAI = () => {
                           <img
                             src={fileData.preview}
                             alt={fileData.name}
-                            className="w-16 h-16 object-cover rounded-lg border-2 border-slate-700"
+                            className="w-16 h-16 object-cover rounded-lg border-2 border-white/10"
                           />
                           <button
                             onClick={() => removeFile(idx)}
@@ -497,7 +506,7 @@ const ChatboxAI = () => {
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center space-x-2 bg-slate-800 border border-slate-700 px-2 py-1.5 rounded-lg">
+                        <div className="flex items-center space-x-2 bg-white/10 border border-white/10 px-2 py-1.5 rounded-lg">
                           <File className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                           <span className="text-xs text-gray-300 max-w-[120px] truncate">{fileData.name}</span>
                           <button
@@ -525,7 +534,7 @@ const ChatboxAI = () => {
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/40 text-gray-400 hover:text-cyan-400 rounded-xl transition-all flex-shrink-0"
+                  className="px-3 py-3 bg-white/10 hover:bg-white/10 border border-white/10 hover:border-cyan-500/40 text-gray-400 hover:text-cyan-400 rounded-xl transition-all flex-shrink-0"
                   title="Đính kèm file"
                 >
                   <Paperclip className="w-5 h-5" />
@@ -540,7 +549,7 @@ const ChatboxAI = () => {
                     onKeyPress={handleKeyPress}
                     placeholder="Nhập tin nhắn, URL, email hoặc số điện thoại cần kiểm tra..."
                     rows={1}
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all resize-none text-sm"
+                    className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all resize-none text-sm"
                     style={{ minHeight: '48px', maxHeight: '120px' }}
                     data-testid="chatbox-input"
                   />

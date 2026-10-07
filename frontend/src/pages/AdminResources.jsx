@@ -98,11 +98,11 @@ const AdminResources = () => {
         </button>
       </div>
       
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-800/50 text-gray-400 text-sm border-b border-slate-700">
+              <tr className="bg-white/5 backdrop-blur-md text-gray-400 text-sm border-b border-white/10">
                 <th className="p-4 font-medium">Phân loại</th>
                 <th className="p-4 font-medium">Tên/Địa chỉ</th>
                 <th className="p-4 font-medium">Loại</th>
@@ -112,7 +112,7 @@ const AdminResources = () => {
             </thead>
             <tbody className="divide-y divide-slate-800">
               {resources.map(item => (
-                <tr key={item.id} className="hover:bg-slate-800/20 transition-colors">
+                <tr key={item.id} className="hover:bg-white/10/20 transition-colors">
                   <td className="p-4">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       item.isSafe ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
@@ -128,10 +128,10 @@ const AdminResources = () => {
                   <td className="p-4 text-gray-400 text-sm">{item.description}</td>
                   <td className="p-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => openEdit(item)} className="p-2 bg-slate-800 hover:bg-cyan-500/20 text-gray-400 hover:text-cyan-400 rounded-lg">
+                      <button onClick={() => openEdit(item)} className="p-2 bg-white/10 hover:bg-cyan-500/20 text-gray-400 hover:text-cyan-400 rounded-lg">
                         <Edit className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDelete(item.id)} className="p-2 bg-slate-800 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-lg">
+                      <button onClick={() => handleDelete(item.id)} className="p-2 bg-white/10 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-lg">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -145,7 +145,7 @@ const AdminResources = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6">
+          <div className="bg-white/5 border border-white/10 rounded-2xl w-full max-w-md p-6">
             <h2 className="text-xl font-bold text-white mb-6">{editingId ? 'Sửa thông tin' : 'Thêm dữ liệu mới'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -153,7 +153,7 @@ const AdminResources = () => {
                 <select 
                   value={formData.isSafe} 
                   onChange={(e) => setFormData({...formData, isSafe: e.target.value === 'true'})}
-                  className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white"
+                  className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white"
                 >
                   <option value="true">Danh sách An toàn</option>
                   <option value="false">Danh sách Cảnh báo (Lừa đảo)</option>
@@ -164,7 +164,7 @@ const AdminResources = () => {
                 <select 
                   value={formData.type} 
                   onChange={(e) => setFormData({...formData, type: e.target.value})}
-                  className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white"
+                  className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white"
                 >
                   <option>Website</option>
                   <option>Tổ chức</option>
@@ -175,18 +175,18 @@ const AdminResources = () => {
               </div>
               <div>
                 <label className="text-sm text-gray-400 block mb-1">Tên tổ chức (Tùy chọn)</label>
-                <input required={formData.isSafe} value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white" />
+                <input required={formData.isSafe} value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white" />
               </div>
               <div>
                 <label className="text-sm text-gray-400 block mb-1">Địa chỉ / Link / SĐT</label>
-                <input required value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} type="text" className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white" />
+                <input required value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} type="text" className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white" />
               </div>
               <div>
                 <label className="text-sm text-gray-400 block mb-1">Mô tả</label>
-                <textarea required value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white h-24" />
+                <textarea required value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white h-24" />
               </div>
               <div className="flex gap-3 mt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-3 bg-slate-800 text-white rounded-xl">Hủy</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-3 bg-white/10 text-white rounded-xl">Hủy</button>
                 <button type="submit" className="flex-1 p-3 bg-cyan-500 text-white rounded-xl font-bold">Lưu lại</button>
               </div>
             </form>

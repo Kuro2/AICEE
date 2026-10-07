@@ -11,7 +11,7 @@ const userSchema = new mongoose.Schema({
   googleId: { type: String, default: null },
   facebookId: { type: String, default: null },
   // Các trường phục vụ chức năng đăng ký (Subscription)
-  plan: { type: String, enum: ['free', 'premium', 'business', 'api'], default: 'free' },
+  plan: { type: String, enum: ['free', 'premium', 'business', 'api', 'platform-api'], default: 'free' },
   scanCount: { type: Number, default: 0 },
   lastScanReset: { type: Date, default: null },
   subscriptionExpires: { type: Date, default: null }
@@ -25,9 +25,12 @@ const UserModel = mongoose.models.User || mongoose.model('User', userSchema);
 function formatUser(userDoc) {
   if (!userDoc) return null;
   const obj = userDoc.toObject ? userDoc.toObject() : userDoc;
-  obj.id = obj._id.toString();
+  obj.id = obj._id ? obj._id.toString() : obj.id;
   delete obj._id;
   delete obj.__v;
+  // Mặc định gói Free và số lượt quét nếu chưa có trong DB
+  if (!obj.plan) obj.plan = 'free';
+  if (obj.scanCount === undefined || obj.scanCount === null) obj.scanCount = 0;
   return obj;
 }
 

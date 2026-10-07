@@ -34,19 +34,19 @@ router.get('/', authenticate, async (req, res) => {
 router.post('/upgrade', authenticate, async (req, res) => {
   try {
     const { plan } = req.body;
-    const validPlans = ['free', 'premium', 'business', 'api'];
+    const validPlans = ['free', 'premium', 'business', 'api', 'platform-api'];
     
     if (!validPlans.includes(plan)) {
-      return res.status(400).json({ success: false, message: 'Gói cước không hợp lệ' });
+      return res.status(400).json({ success: false, message: 'Gói cước không hợp lệ: ' + plan });
     }
 
     const user = await UserModel.findById(req.user.id);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản người dùng' });
 
-    // Mô phỏng thanh toán thành công
+    // Cập nhật gói cước
     user.plan = plan;
     
-    // Nếu nâng cấp lên premium/business/api, set hạn dùng là 30 ngày (hoặc 1 năm cho business)
+    // Nếu nâng cấp lên premium/business/api/platform-api, set hạn dùng là 30 ngày (hoặc 1 năm cho business)
     if (plan !== 'free') {
       const expires = new Date();
       if (plan === 'business') {
@@ -70,7 +70,8 @@ router.post('/upgrade', authenticate, async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Lỗi khi nâng cấp gói cước' });
+    console.error('Upgrade plan error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Lỗi khi nâng cấp gói cước' });
   }
 });
 

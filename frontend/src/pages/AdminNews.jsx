@@ -108,10 +108,10 @@ const AdminNews = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {news.map(item => (
-          <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col group">
+          <div key={item.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col group">
             <div className="h-48 relative overflow-hidden">
               <img src={item.image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-              <div className="absolute top-2 left-2 bg-slate-900/80 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+              <div className="absolute top-2 left-2 bg-white/5 backdrop-blur-md text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
                 {item.category}
               </div>
             </div>
@@ -119,16 +119,16 @@ const AdminNews = () => {
               <h3 className="text-white font-bold text-lg mb-2 line-clamp-2">{item.title}</h3>
               <p className="text-gray-400 text-sm line-clamp-2 flex-1">{item.excerpt}</p>
               
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
                 <div className="text-gray-500 text-xs">{item.date}</div>
                 <div className="flex gap-2">
-                  <Link to={`/news/${item.id}`} target="_blank" className="p-2 bg-slate-800 hover:bg-slate-700 text-gray-400 rounded-lg">
+                  <Link to={`/news/${item.id}`} target="_blank" className="p-2 bg-white/10 hover:bg-white/10 text-gray-400 rounded-lg">
                     <Eye className="w-4 h-4" />
                   </Link>
-                  <button onClick={() => openEdit(item)} className="p-2 bg-slate-800 hover:bg-cyan-500/20 text-gray-400 hover:text-cyan-400 rounded-lg">
+                  <button onClick={() => openEdit(item)} className="p-2 bg-white/10 hover:bg-cyan-500/20 text-gray-400 hover:text-cyan-400 rounded-lg">
                     <Edit className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(item.id)} className="p-2 bg-slate-800 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-lg">
+                  <button onClick={() => handleDelete(item.id)} className="p-2 bg-white/10 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-lg">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -140,20 +140,20 @@ const AdminNews = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white/5 border border-white/10 rounded-2xl w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-white mb-6">{editingId ? 'Sửa bài viết' : 'Viết bài mới'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-sm text-gray-400 block mb-1">Tiêu đề bài viết</label>
-                  <input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} type="text" className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white" />
+                  <input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} type="text" className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white" />
                 </div>
                 <div>
                   <label className="text-sm text-gray-400 block mb-1">Danh mục</label>
                   <select 
                     value={formData.category} 
                     onChange={(e) => setFormData({...formData, category: e.target.value})}
-                    className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white"
+                    className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white"
                   >
                     <option>Cảnh báo lừa đảo</option>
                     <option>Cập nhật sản phẩm</option>
@@ -165,23 +165,23 @@ const AdminNews = () => {
                 </div>
                 <div>
                   <label className="text-sm text-gray-400 block mb-1">Link Ảnh Bìa</label>
-                  <input required value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} type="text" className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white" placeholder="https://..." />
+                  <input required value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} type="text" className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white" placeholder="https://..." />
                 </div>
                 <div className="col-span-2">
                   <label className="text-sm text-gray-400 block mb-1">Đoạn tóm tắt (Excerpt)</label>
-                  <textarea required value={formData.excerpt} onChange={e => setFormData({...formData, excerpt: e.target.value})} className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white h-20" />
+                  <textarea required value={formData.excerpt} onChange={e => setFormData({...formData, excerpt: e.target.value})} className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white h-20" />
                 </div>
                 <div className="col-span-2">
                   <label className="text-sm text-gray-400 block mb-1">Nội dung chi tiết</label>
-                  <textarea required value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white h-40" />
+                  <textarea required value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white h-40" />
                 </div>
                 <div className="col-span-2">
                   <label className="text-sm text-gray-400 block mb-1">Thẻ Tags (cách nhau bằng dấu phẩy)</label>
-                  <input value={formData.tags} onChange={e => setFormData({...formData, tags: e.target.value})} type="text" className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white" placeholder="AI, Bảo mật, Lừa đảo..." />
+                  <input value={formData.tags} onChange={e => setFormData({...formData, tags: e.target.value})} type="text" className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white" placeholder="AI, Bảo mật, Lừa đảo..." />
                 </div>
               </div>
               <div className="flex gap-3 mt-8">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-3 bg-slate-800 text-white rounded-xl">Hủy</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-3 bg-white/10 text-white rounded-xl">Hủy</button>
                 <button type="submit" className="flex-1 p-3 bg-cyan-500 text-white rounded-xl font-bold">Lưu Bài Viết</button>
               </div>
             </form>

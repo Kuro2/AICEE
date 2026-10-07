@@ -25,9 +25,11 @@ async function checkScanLimit(req, res, next) {
       user.lastScanReset = today;
     }
 
-    // Kiểm tra giới hạn gói Free
-    if (user.plan === 'free') {
-      if (user.scanCount >= 5) {
+    const currentPlan = (user.plan || 'free').toLowerCase();
+
+    // Kiểm tra giới hạn gói Free (tối đa 5 lượt/ngày)
+    if (currentPlan === 'free') {
+      if ((user.scanCount || 0) >= 5) {
         return res.status(403).json({
           success: false,
           isLimitReached: true,
@@ -37,7 +39,7 @@ async function checkScanLimit(req, res, next) {
     }
 
     // Tăng số lượt quét
-    user.scanCount += 1;
+    user.scanCount = (user.scanCount || 0) + 1;
     await user.save();
 
     next();

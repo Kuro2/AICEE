@@ -10,7 +10,7 @@ const Pricing = () => {
   const [billingCycle, setBillingCycle] = useState('monthly');
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, plan: null, amount: 0 });
   const navigate = useNavigate();
-  const user = authAPI.getCurrentUser();
+  const [user, setUser] = useState(() => authAPI.getCurrentUser());
 
   const handleUpgrade = (planId, priceString) => {
     if (!user) {
@@ -28,23 +28,36 @@ const Pricing = () => {
   };
 
   const confirmPayment = async () => {
+    const token = localStorage.getItem('aicee_token');
+    if (!token) {
+      alert('🔒 Bạn cần đăng nhập để thực hiện nâng cấp gói cước.');
+      navigate('/login');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await subscriptionAPI.upgradePlan(paymentModal.plan);
-      if (res.success) {
-        alert('🎉 Thanh toán thành công! Gói cước của bạn đã được nâng cấp.');
+      if (res && res.success) {
+        const upgradedPlan = res.data?.plan || paymentModal.plan;
+        alert('🎉 Thanh toán thành công! Gói cước của bạn đã được nâng cấp lên ' + upgradedPlan.toUpperCase() + '.');
         
         if (user) {
-          const updatedUser = { ...user, plan: res.data.plan, subscriptionExpires: res.data.subscriptionExpires };
+          const updatedUser = { 
+            ...user, 
+            plan: upgradedPlan, 
+            subscriptionExpires: res.data?.subscriptionExpires 
+          };
           localStorage.setItem('aicee_user', JSON.stringify(updatedUser));
+          setUser(updatedUser);
         }
-
-        window.location.reload();
       } else {
-        alert(res.message || 'Lỗi khi nâng cấp gói cước');
+        alert(res?.message || 'Lỗi khi nâng cấp gói cước');
       }
     } catch (error) {
-      alert('Có lỗi xảy ra, vui lòng thử lại.');
+      console.error('Lỗi thanh toán / nâng cấp:', error);
+      const errorMsg = error.data?.message || error.message || 'Có lỗi xảy ra, vui lòng thử lại.';
+      alert(errorMsg);
     } finally {
       setLoading(false);
       setPaymentModal({ isOpen: false, plan: null, amount: 0 });
@@ -128,90 +141,131 @@ const Pricing = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#111111] flex flex-col font-sans selection:bg-cyan-500/30">
+    <div className="min-h-screen bg-[#050505] flex flex-col font-sans selection:bg-cyan-500/30 relative overflow-hidden">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-cyan-600/20 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute top-[20%] right-[-10%] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+      
       <Header />
       
-      <main className="flex-grow pt-32 pb-24 px-4 sm:px-6 lg:px-8 flex flex-col items-center">
+      <main className="flex-grow pt-32 pb-24 px-4 sm:px-6 lg:px-8 flex flex-col items-center relative z-10">
         
-        <h1 className="text-4xl md:text-5xl font-bold text-white text-center mb-6">
-          Dùng thử AICEE Premium
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-8 backdrop-blur-md">
+          <Sparkles className="w-4 h-4 text-cyan-400" />
+          <span className="text-sm font-medium text-gray-300">Nâng tầm bảo mật với AI</span>
+        </div>
+
+        <h1 className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white via-gray-200 to-gray-600 text-center mb-6 tracking-tight">
+          Bảo vệ thông minh hơn
         </h1>
-        <p className="text-gray-400 text-center max-w-2xl mb-10 text-lg">
-          Lựa chọn gói cước phù hợp để bảo vệ bạn, gia đình, hoặc tổ chức khỏi các mối đe dọa lừa đảo trên không gian mạng.
+        <p className="text-gray-400 text-center max-w-2xl mb-12 text-lg md:text-xl font-light leading-relaxed">
+          Lựa chọn gói cước phù hợp để bảo vệ bạn, gia đình và tổ chức khỏi các mối đe dọa trên không gian mạng.
         </p>
 
         {/* Toggle Switch */}
-        <div className="flex bg-[#222222] rounded-full p-1 mb-16 border border-[#333333]">
+        <div className="flex bg-white/5 p-1.5 rounded-full mb-16 border border-white/10 backdrop-blur-md shadow-2xl relative">
           <button
             onClick={() => setBillingCycle('monthly')}
-            className={`px-8 py-3 rounded-full text-sm font-medium transition-colors ${
-              billingCycle === 'monthly' ? 'bg-[#333333] text-white' : 'text-gray-400 hover:text-white'
+            className={`px-8 py-3 rounded-full text-sm font-semibold transition-all duration-300 ${
+              billingCycle === 'monthly' 
+                ? 'bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-lg border border-white/10' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
           >
             Thanh toán Tháng
           </button>
           <button
             onClick={() => setBillingCycle('yearly')}
-            className={`px-8 py-3 rounded-full text-sm font-medium transition-colors flex items-center gap-2 ${
-              billingCycle === 'yearly' ? 'bg-[#333333] text-white' : 'text-gray-400 hover:text-white'
+            className={`px-8 py-3 rounded-full text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+              billingCycle === 'yearly' 
+                ? 'bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-lg border border-white/10' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
           >
             Thanh toán Năm
-            <span className="bg-cyan-500/20 text-cyan-400 text-xs px-2 py-0.5 rounded-full border border-cyan-500/20">
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+              billingCycle === 'yearly' ? 'bg-cyan-500 text-white' : 'bg-cyan-500/20 text-cyan-400'
+            }`}>
               Giảm 20%
             </span>
           </button>
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl w-full mx-auto">
           {plans.map((plan) => (
             <div 
               key={plan.id}
-              className={`relative flex flex-col rounded-3xl p-6 transition-all duration-300 ${
+              className={`relative flex flex-col rounded-[2rem] p-8 transition-all duration-500 hover:-translate-y-2 group ${
                 plan.highlight 
-                  ? 'bg-[#1a1a2e] border-2 border-cyan-500 shadow-[0_0_40px_-10px_rgba(6,182,212,0.3)] transform lg:-translate-y-4' 
-                  : 'bg-[#1a1a1a] border border-[#333333] hover:border-gray-500'
+                  ? 'bg-gradient-to-b from-[#111827] to-[#030712] border border-cyan-500/50 shadow-[0_0_60px_-15px_rgba(6,182,212,0.4)]' 
+                  : 'bg-white/[0.02] border border-white/10 hover:border-white/20 hover:bg-white/[0.04] backdrop-blur-xl'
               }`}
             >
               {plan.highlight && (
-                <div className="absolute top-0 right-6 transform -translate-y-1/2">
-                  <span className="bg-cyan-500 text-white text-xs font-bold uppercase tracking-wider py-1 px-3 rounded-full">
-                    Khuyên dùng
-                  </span>
-                </div>
+                <>
+                  {/* Premium Glow inner */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-[2rem] pointer-events-none"></div>
+                  
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                    <div className="bg-gradient-to-r from-cyan-400 to-blue-500 text-white text-xs font-bold uppercase tracking-widest py-1.5 px-4 rounded-full shadow-[0_0_20px_rgba(6,182,212,0.5)]">
+                      Khuyên dùng
+                    </div>
+                  </div>
+                </>
               )}
 
-              <div className="mb-6">
-                <h3 className="text-xl font-bold text-white mb-2 flex items-center">
-                  {plan.name} {plan.icon}
+              <div className="mb-8 relative z-10">
+                <h3 className="text-2xl font-bold text-white mb-3 flex items-center gap-3">
+                  {plan.icon}
+                  {plan.name}
                 </h3>
-                <p className="text-gray-400 text-sm h-10">{plan.description}</p>
+                <p className="text-gray-400 text-sm h-12 leading-relaxed">{plan.description}</p>
               </div>
 
-              <div className="mb-6 flex items-end">
-                <span className="text-4xl font-bold text-white">{plan.price}</span>
-                <span className="text-gray-400 ml-1 pb-1">{plan.period}</span>
+              <div className="mb-8 flex items-baseline relative z-10 flex-wrap">
+                <span className="text-4xl xl:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400">
+                  {plan.price}
+                </span>
+                {plan.id !== 'free' && (
+                  <span className="text-gray-500 ml-2 font-medium">{plan.period}</span>
+                )}
               </div>
 
-              <button
-                onClick={() => plan.buttonAction(plan.price)}
-                disabled={plan.id === 'free'}
-                className={`w-full py-3 px-4 rounded-2xl font-semibold transition-all mb-8 flex items-center justify-center gap-2 ${
-                  plan.highlight
-                    ? 'bg-cyan-500 hover:bg-cyan-400 text-white shadow-lg shadow-cyan-500/25'
-                    : 'bg-white hover:bg-gray-100 text-black'
-                } ${plan.id === 'free' ? 'opacity-50 cursor-not-allowed bg-[#333333] text-white hover:bg-[#333333]' : ''}`}
-              >
-                {plan.buttonText}
-              </button>
+              {(() => {
+                const currentPlanId = (user?.plan || 'free').toLowerCase();
+                const isCurrentPlan = currentPlanId === plan.id || (currentPlanId === 'platform-api' && plan.id === 'api');
+                return (
+                  <button
+                    onClick={() => plan.buttonAction(plan.price)}
+                    disabled={isCurrentPlan}
+                    className={`w-full py-3.5 px-4 rounded-xl font-bold transition-all duration-300 mb-8 flex items-center justify-center gap-2 relative overflow-hidden group/btn ${
+                      isCurrentPlan
+                        ? 'opacity-85 cursor-default bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                        : plan.highlight
+                          ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg hover:shadow-cyan-500/30 hover:scale-[1.02] active:scale-95'
+                          : 'bg-white text-black hover:bg-gray-100 hover:scale-[1.02] active:scale-95'
+                    }`}
+                  >
+                    {plan.highlight && !isCurrentPlan && (
+                      <div className="absolute inset-0 -translate-x-[150%] group-hover/btn:translate-x-[150%] transition-transform duration-1000 ease-in-out bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-12"></div>
+                    )}
+                    <span className="relative z-10">{isCurrentPlan ? '✓ Gói hiện tại của bạn' : plan.buttonText}</span>
+                  </button>
+                );
+              })()}
 
-              <div className="space-y-4 flex-1">
-                <p className="text-sm font-medium text-white mb-4">Mọi thứ trong gói này gồm:</p>
+              <div className="space-y-4 flex-1 relative z-10">
+                <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent mb-6"></div>
                 {plan.features.map((feature, idx) => (
-                  <div key={idx} className="flex items-start">
-                    <Check className={`w-5 h-5 shrink-0 mr-3 ${plan.highlight ? 'text-cyan-500' : 'text-gray-400'}`} />
-                    <span className="text-gray-300 text-sm leading-relaxed">{feature}</span>
+                  <div key={idx} className="flex items-start group/feature">
+                    <div className={`mt-0.5 mr-3 rounded-full p-0.5 transition-colors ${
+                      plan.highlight ? 'bg-cyan-500/20 text-cyan-400 group-hover/feature:bg-cyan-500/30' : 'bg-white/5 text-gray-400 group-hover/feature:text-gray-200'
+                    }`}>
+                      <Check className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-gray-300 text-sm leading-relaxed group-hover/feature:text-white transition-colors">{feature}</span>
                   </div>
                 ))}
               </div>
@@ -220,59 +274,66 @@ const Pricing = () => {
         </div>
         
         {/* FAQ or Info Section */}
-        <div className="mt-20 flex items-center justify-center gap-2 text-gray-400 bg-[#1a1a1a] px-6 py-4 rounded-2xl border border-[#333333]">
-          <Info className="w-5 h-5 text-cyan-500" />
-          <span className="text-sm">Gói Business dành cho doanh nghiệp mua theo năm sẽ tiết kiệm hơn 7%.</span>
+        <div className="mt-20 flex items-center justify-center gap-3 text-gray-400 bg-white/[0.02] px-6 py-4 rounded-full border border-white/5 backdrop-blur-md">
+          <div className="bg-cyan-500/20 p-1.5 rounded-full">
+            <Info className="w-4 h-4 text-cyan-400" />
+          </div>
+          <span className="text-sm font-medium">Gói Business dành cho doanh nghiệp mua theo năm sẽ tiết kiệm hơn 7%.</span>
         </div>
       </main>
 
       {/* Payment Modal */}
       {paymentModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#1a1a1a] border border-[#333333] rounded-3xl p-8 max-w-md w-full relative animate-in fade-in zoom-in duration-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xl p-4">
+          <div className="bg-[#0a0a0a] border border-white/10 rounded-[2rem] p-8 max-w-md w-full relative shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in-95 duration-300">
+            {/* Modal Decorative background */}
+            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-cyan-900/30 to-transparent rounded-t-[2rem] pointer-events-none"></div>
+
             <button 
               onClick={() => setPaymentModal({ isOpen: false, plan: null, amount: 0 })}
-              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white bg-[#333333] rounded-full transition-colors"
+              className="absolute top-5 right-5 p-2 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-all z-10"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <QrCode className="w-8 h-8 text-white" />
+            <div className="text-center mb-8 relative z-10">
+              <div className="w-20 h-20 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(6,182,212,0.3)] transform rotate-3">
+                <QrCode className="w-10 h-10 text-white -rotate-3" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Thanh toán Quét mã QR</h2>
-              <p className="text-gray-400">Bạn đang nâng cấp lên gói <span className="text-cyan-400 font-bold capitalize">{paymentModal.plan}</span></p>
+              <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 mb-2">Thanh toán VNPay</h2>
+              <p className="text-gray-400">Nâng cấp lên gói <span className="text-cyan-400 font-bold uppercase tracking-wider">{paymentModal.plan}</span></p>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl flex items-center justify-center mb-6">
+            <div className="bg-white p-4 rounded-3xl flex items-center justify-center mb-8 shadow-xl relative z-10 group">
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-3xl opacity-50 blur-xl group-hover:opacity-75 transition-opacity duration-500 -z-10"></div>
               {/* VietQR Image API */}
               <img 
                 src={`https://img.vietqr.io/image/MB-1903673562013-compact2.png?amount=${paymentModal.amount}&addInfo=AICEE%20${user?.email?.split('@')[0]}%20${paymentModal.plan}&accountName=AICEE%20TECH`} 
                 alt="QR Code" 
-                className="w-full max-w-[250px] object-contain rounded-xl"
+                className="w-full max-w-[220px] object-contain rounded-2xl relative z-10"
               />
             </div>
 
-            <div className="space-y-3 mb-8 bg-[#222222] p-4 rounded-xl border border-[#333333]">
-              <div className="flex justify-between">
-                <span className="text-gray-400 text-sm">Số tiền:</span>
-                <span className="text-white font-bold">{paymentModal.amount.toLocaleString()} VNĐ</span>
+            <div className="space-y-4 mb-8 bg-white/5 p-5 rounded-2xl border border-white/10 relative z-10">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-sm font-medium">Số tiền chuyển:</span>
+                <span className="text-white font-bold text-lg">{paymentModal.amount.toLocaleString()} VNĐ</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400 text-sm">Nội dung:</span>
-                <span className="text-cyan-400 font-medium">AICEE {user?.email?.split('@')[0]} {paymentModal.plan}</span>
+              <div className="h-px w-full bg-white/10"></div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-sm font-medium">Nội dung (Bắt buộc):</span>
+                <span className="text-cyan-400 font-bold bg-cyan-400/10 px-3 py-1 rounded-lg">AICEE {user?.email?.split('@')[0]} {paymentModal.plan}</span>
               </div>
             </div>
 
             <button
               onClick={confirmPayment}
               disabled={loading}
-              className="w-full py-4 px-4 bg-cyan-500 hover:bg-cyan-400 text-white rounded-xl font-bold transition-all shadow-[0_0_20px_-5px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2"
+              className="w-full py-4 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 relative z-10"
             >
-              {loading ? <Loader className="w-5 h-5 animate-spin" /> : 'Tôi đã chuyển khoản thành công'}
+              {loading ? <Loader className="w-5 h-5 animate-spin" /> : 'Xác nhận đã thanh toán'}
             </button>
-            <p className="text-center text-xs text-gray-500 mt-4">Hệ thống sẽ tự động xác nhận trong vòng 1-3 phút.</p>
+            <p className="text-center text-xs text-gray-500 mt-5 font-medium">Hệ thống sẽ tự động xác nhận trong vài phút.</p>
           </div>
         </div>
       )}
