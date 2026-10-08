@@ -1,67 +1,168 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { Check, Info, Loader, Sparkles, Building, Code2, QrCode, X } from 'lucide-react';
-import { subscriptionAPI, authAPI } from '@/services/api';
+import { 
+  Check, 
+  Info, 
+  Loader, 
+  Sparkles, 
+  Building, 
+  Code2, 
+  QrCode, 
+  X, 
+  Copy, 
+  CheckCircle2, 
+  ShieldCheck, 
+  Zap, 
+  RefreshCw, 
+  AlertCircle 
+} from 'lucide-react';
+import { paymentAPI, authAPI } from '@/services/api';
 
 const Pricing = () => {
   const [loading, setLoading] = useState(false);
   const [billingCycle, setBillingCycle] = useState('monthly');
-  const [paymentModal, setPaymentModal] = useState({ isOpen: false, plan: null, amount: 0 });
   const navigate = useNavigate();
   const [user, setUser] = useState(() => authAPI.getCurrentUser());
 
-  const handleUpgrade = (planId, priceString) => {
+  // SePay Payment Modal State
+  const [paymentModal, setPaymentModal] = useState({
+    isOpen: false,
+    orderCode: '',
+    plan: null,
+    amount: 0,
+    qrUrl: '',
+    vietQrUrl: '',
+    bankInfo: null,
+    isPaid: false,
+    statusText: 'Đang lắng nghe giao dịch SePay...'
+  });
+
+  const [copiedField, setCopiedField] = useState(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const pollingRef = useRef(null);
+
+  // Auto-polling kiểm tra biến động số dư qua SePay khi modal mở
+  useEffect(() => {
+    if (!paymentModal.isOpen || paymentModal.isPaid || !paymentModal.orderCode) {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      return;
+    }
+
+    const checkStatus = async () => {
+      try {
+        const res = await paymentAPI.checkStatus(paymentModal.orderCode);
+        if (res && res.isPaid) {
+          handlePaymentSuccess(res.data?.plan || paymentModal.plan, res.data?.subscriptionExpires);
+        }
+      } catch (err) {
+        console.warn('Lỗi kiểm tra SePay:', err);
+      }
+    };
+
+    // Kiểm tra định kỳ mỗi 3.5 giây
+    pollingRef.current = setInterval(checkStatus, 3500);
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [paymentModal.isOpen, paymentModal.isPaid, paymentModal.orderCode]);
+
+  const handlePaymentSuccess = (upgradedPlan, subscriptionExpires) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+
+    setPaymentModal(prev => ({
+      ...prev,
+      isPaid: true,
+      statusText: 'Giao dịch thành công!'
+    }));
+
+    if (user) {
+      const updatedUser = { 
+        ...user, 
+        plan: upgradedPlan, 
+        subscriptionExpires: subscriptionExpires || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      };
+      localStorage.setItem('aicee_user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+    }
+  };
+
+  const handleUpgrade = async (planId, priceString) => {
     if (!user) {
       navigate('/login');
       return;
     }
     
     if (planId === 'free') return; 
-    
-    // Tính số tiền thực (loại bỏ ký tự đ và dấu chấm)
-    const amount = parseInt(priceString.replace(/\D/g, ''));
-
-    // Mở modal thanh toán QR
-    setPaymentModal({ isOpen: true, plan: planId, amount });
-  };
-
-  const confirmPayment = async () => {
-    const token = localStorage.getItem('aicee_token');
-    if (!token) {
-      alert('🔒 Bạn cần đăng nhập để thực hiện nâng cấp gói cước.');
-      navigate('/login');
-      return;
-    }
 
     setLoading(true);
     try {
-      const res = await subscriptionAPI.upgradePlan(paymentModal.plan);
+      // Tạo đơn hàng thanh toán SePay trên Backend
+      const res = await paymentAPI.createOrder(planId, billingCycle);
       if (res && res.success) {
-        const upgradedPlan = res.data?.plan || paymentModal.plan;
-        alert('🎉 Thanh toán thành công! Gói cước của bạn đã được nâng cấp lên ' + upgradedPlan.toUpperCase() + '.');
-        
-        if (user) {
-          const updatedUser = { 
-            ...user, 
-            plan: upgradedPlan, 
-            subscriptionExpires: res.data?.subscriptionExpires 
-          };
-          localStorage.setItem('aicee_user', JSON.stringify(updatedUser));
-          setUser(updatedUser);
-        }
+        const orderData = res.data;
+        setPaymentModal({
+          isOpen: true,
+          orderCode: orderData.orderCode,
+          plan: orderData.plan,
+          amount: orderData.amount,
+          qrUrl: orderData.qrUrl,
+          vietQrUrl: orderData.vietQrUrl,
+          bankInfo: orderData.bankInfo,
+          isPaid: false,
+          statusText: 'Đang lắng nghe biến động số dư SePay...'
+        });
       } else {
-        alert(res?.message || 'Lỗi khi nâng cấp gói cước');
+        alert(res?.message || 'Không thể tạo đơn hàng thanh toán');
       }
     } catch (error) {
-      console.error('Lỗi thanh toán / nâng cấp:', error);
-      const errorMsg = error.data?.message || error.message || 'Có lỗi xảy ra, vui lòng thử lại.';
-      alert(errorMsg);
+      console.error('Lỗi tạo đơn SePay:', error);
+      alert(error.message || 'Không thể kết nối đến cổng thanh toán SePay');
     } finally {
       setLoading(false);
-      setPaymentModal({ isOpen: false, plan: null, amount: 0 });
     }
+  };
+
+  // Nút thủ công để kiểm tra thanh toán ngay
+  const handleManualCheck = async () => {
+    if (!paymentModal.orderCode || isChecking) return;
+    setIsChecking(true);
+    try {
+      const res = await paymentAPI.checkStatus(paymentModal.orderCode);
+      if (res && res.isPaid) {
+        handlePaymentSuccess(res.data?.plan || paymentModal.plan, res.data?.subscriptionExpires);
+      } else {
+        alert('⏳ Hệ thống SePay chưa nhận được khoản chuyển. Vui lòng kiểm tra lại tiền trong tài khoản hoặc thử lại sau vài giây!');
+      }
+    } catch (err) {
+      alert('Lỗi kiểm tra giao dịch: ' + (err.message || 'Thử lại sau'));
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  // Hỗ trợ mô phỏng thanh toán thành công (dành cho demo / test)
+  const handleSimulatePayment = async () => {
+    if (!paymentModal.orderCode) return;
+    try {
+      setIsChecking(true);
+      const res = await paymentAPI.simulatePayment(paymentModal.orderCode);
+      if (res && res.success) {
+        handlePaymentSuccess(res.data?.plan || paymentModal.plan, res.data?.subscriptionExpires);
+      }
+    } catch (err) {
+      alert('Lỗi mô phỏng thanh toán: ' + err.message);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const copyToClipboard = (text, fieldName) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
   const plans = [
@@ -282,58 +383,207 @@ const Pricing = () => {
         </div>
       </main>
 
-      {/* Payment Modal */}
+      {/* SePay Automated Payment Modal */}
       {paymentModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xl p-4">
-          <div className="bg-[#0a0a0a] border border-white/10 rounded-[2rem] p-8 max-w-md w-full relative shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in-95 duration-300">
-            {/* Modal Decorative background */}
-            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-cyan-900/30 to-transparent rounded-t-[2rem] pointer-events-none"></div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in duration-300">
+          <div className="bg-[#0a0a0a] border border-cyan-500/30 rounded-[2.5rem] p-6 sm:p-8 max-w-lg w-full relative shadow-[0_0_60px_rgba(6,182,212,0.25)] overflow-hidden max-h-[92vh] overflow-y-auto">
+            {/* Modal Decorative background glow */}
+            <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-cyan-600/20 to-transparent rounded-t-[2.5rem] pointer-events-none"></div>
 
             <button 
-              onClick={() => setPaymentModal({ isOpen: false, plan: null, amount: 0 })}
-              className="absolute top-5 right-5 p-2 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-all z-10"
+              onClick={() => {
+                if (pollingRef.current) clearInterval(pollingRef.current);
+                setPaymentModal(prev => ({ ...prev, isOpen: false }));
+              }}
+              className="absolute top-5 right-5 p-2 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-all z-20"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="text-center mb-8 relative z-10">
-              <div className="w-20 h-20 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(6,182,212,0.3)] transform rotate-3">
-                <QrCode className="w-10 h-10 text-white -rotate-3" />
-              </div>
-              <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 mb-2">Thanh toán VNPay</h2>
-              <p className="text-gray-400">Nâng cấp lên gói <span className="text-cyan-400 font-bold uppercase tracking-wider">{paymentModal.plan}</span></p>
-            </div>
+            {paymentModal.isPaid ? (
+              /* MÀN HÌNH CHÚC MỪNG KHI SEPAY NHẬN ĐƯỢC TIỀN */
+              <div className="text-center py-6 relative z-10 animate-in zoom-in-95 duration-500">
+                <div className="w-20 h-20 bg-emerald-500/20 border border-emerald-500/40 rounded-3xl flex items-center justify-center mx-auto mb-6 text-emerald-400 shadow-[0_0_40px_rgba(16,185,129,0.3)] animate-bounce">
+                  <CheckCircle2 className="w-12 h-12" />
+                </div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
+                  <ShieldCheck className="w-4 h-4" />
+                  Xác Nhận Thành Công Qua SePay
+                </div>
+                <h2 className="text-3xl font-extrabold text-white mb-2">
+                  Thanh Toán Thành Công!
+                </h2>
+                <p className="text-gray-300 text-sm max-w-sm mx-auto mb-6">
+                  Cảm ơn bạn! Tài khoản đã được nâng cấp lên gói <span className="text-cyan-400 font-bold uppercase tracking-wider">{paymentModal.plan}</span>. Toàn bộ tính năng cao cấp đã sẵn sàng.
+                </p>
 
-            <div className="bg-white p-4 rounded-3xl flex items-center justify-center mb-8 shadow-xl relative z-10 group">
-              <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-3xl opacity-50 blur-xl group-hover:opacity-75 transition-opacity duration-500 -z-10"></div>
-              {/* VietQR Image API */}
-              <img 
-                src={`https://img.vietqr.io/image/MB-1903673562013-compact2.png?amount=${paymentModal.amount}&addInfo=AICEE%20${user?.email?.split('@')[0]}%20${paymentModal.plan}&accountName=AICEE%20TECH`} 
-                alt="QR Code" 
-                className="w-full max-w-[220px] object-contain rounded-2xl relative z-10"
-              />
-            </div>
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-left text-xs space-y-2 mb-6">
+                  <div className="flex justify-between text-gray-400">
+                    <span>Mã đơn hàng:</span>
+                    <span className="font-mono text-cyan-400 font-bold">{paymentModal.orderCode}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-400">
+                    <span>Gói dịch vụ:</span>
+                    <span className="text-white font-bold uppercase">{paymentModal.plan}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-400">
+                    <span>Số tiền đã thanh toán:</span>
+                    <span className="text-emerald-400 font-bold">{paymentModal.amount.toLocaleString()} VNĐ</span>
+                  </div>
+                  <div className="flex justify-between text-gray-400">
+                    <span>Cổng giao dịch:</span>
+                    <span className="text-white">TPBank (Tự động bởi SePay)</span>
+                  </div>
+                </div>
 
-            <div className="space-y-4 mb-8 bg-white/5 p-5 rounded-2xl border border-white/10 relative z-10">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400 text-sm font-medium">Số tiền chuyển:</span>
-                <span className="text-white font-bold text-lg">{paymentModal.amount.toLocaleString()} VNĐ</span>
+                <button
+                  onClick={() => {
+                    setPaymentModal(prev => ({ ...prev, isOpen: false }));
+                    navigate('/chatbox');
+                  }}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-extrabold rounded-2xl transition-all shadow-lg shadow-emerald-500/25 text-sm"
+                >
+                  Bắt Đầu Trải Nghiệm Chatbox AI Ngay
+                </button>
               </div>
-              <div className="h-px w-full bg-white/10"></div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400 text-sm font-medium">Nội dung (Bắt buộc):</span>
-                <span className="text-cyan-400 font-bold bg-cyan-400/10 px-3 py-1 rounded-lg">AICEE {user?.email?.split('@')[0]} {paymentModal.plan}</span>
-              </div>
-            </div>
+            ) : (
+              /* MÀN HÌNH QUÉT MÃ QR SEPAY */
+              <div className="relative z-10">
+                <div className="text-center mb-6">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                    <Zap className="w-3.5 h-3.5 fill-cyan-400" />
+                    Cổng Thanh Toán Tự Động SePay
+                  </div>
+                  <h2 className="text-2xl font-extrabold text-white mb-1">
+                    Quét Mã VietQR Thanh Toán
+                  </h2>
+                  <p className="text-gray-400 text-xs">
+                    Nâng cấp gói <span className="text-cyan-400 font-bold uppercase tracking-wider">{paymentModal.plan}</span> ({paymentModal.amount.toLocaleString()} VNĐ)
+                  </p>
+                </div>
 
-            <button
-              onClick={confirmPayment}
-              disabled={loading}
-              className="w-full py-4 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 relative z-10"
-            >
-              {loading ? <Loader className="w-5 h-5 animate-spin" /> : 'Xác nhận đã thanh toán'}
-            </button>
-            <p className="text-center text-xs text-gray-500 mt-5 font-medium">Hệ thống sẽ tự động xác nhận trong vài phút.</p>
+                {/* QR Code Container */}
+                <div className="bg-white p-4 rounded-3xl flex flex-col items-center justify-center mb-5 shadow-2xl relative group max-w-[260px] mx-auto">
+                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-3xl opacity-40 blur-xl group-hover:opacity-70 transition-opacity -z-10"></div>
+                  <img 
+                    src={paymentModal.qrUrl || paymentModal.vietQrUrl} 
+                    alt="SePay VietQR" 
+                    className="w-full object-contain rounded-xl"
+                  />
+                  <div className="text-center mt-2">
+                    <span className="text-[10px] font-bold text-slate-800 tracking-wider uppercase block">
+                      Hỗ Trợ Mọi Ứng Dụng Ngân Hàng & Ví Điện Tử
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bank Account Details with 1-click Copy */}
+                <div className="space-y-2.5 mb-5 bg-white/5 p-4 rounded-2xl border border-white/10 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Ngân hàng:</span>
+                    <span className="text-white font-bold">{paymentModal.bankInfo?.bankName || 'TPBank (Ngân Hàng Tiên Phong)'}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Chủ tài khoản:</span>
+                    <span className="text-white font-semibold">{paymentModal.bankInfo?.accountHolder || 'TRAN TRUNG HAI'}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Số tài khoản:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-mono font-bold text-sm">{paymentModal.bankInfo?.accountNumber || '10005920328'}</span>
+                      <button
+                        onClick={() => copyToClipboard(paymentModal.bankInfo?.accountNumber || '10005920328', 'acc')}
+                        className="p-1 rounded bg-white/10 hover:bg-white/20 text-gray-300"
+                        title="Sao chép số tài khoản"
+                      >
+                        {copiedField === 'acc' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Số tiền:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-emerald-400 font-bold text-sm">{paymentModal.amount.toLocaleString()} VNĐ</span>
+                      <button
+                        onClick={() => copyToClipboard(String(paymentModal.amount), 'amount')}
+                        className="p-1 rounded bg-white/10 hover:bg-white/20 text-gray-300"
+                        title="Sao chép số tiền"
+                      >
+                        {copiedField === 'amount' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Order Code / Transfer Content */}
+                  <div className="pt-2 border-t border-white/10">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-yellow-400 font-semibold">Nội dung chuyển khoản (Bắt buộc):</span>
+                      <button
+                        onClick={() => copyToClipboard(paymentModal.orderCode, 'code')}
+                        className="px-2 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 font-bold text-[11px] flex items-center gap-1 transition-colors"
+                      >
+                        {copiedField === 'code' ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-400" />
+                            Đã sao chép
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            Sao chép mã
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/40 text-center font-mono font-extrabold text-cyan-300 text-base tracking-widest select-all">
+                      {paymentModal.orderCode}
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1.5 flex items-start gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                      <span>Quý khách vui lòng điền đúng mã nội dung để hệ thống SePay tự động ghi nhận và kích hoạt ngay.</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Radar Polling Status */}
+                <div className="flex items-center justify-center gap-2.5 py-2 px-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-semibold mb-4">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+                  </span>
+                  <span>Đang kết nối SePay: Tự động kích hoạt khi có tiền vào...</span>
+                </div>
+
+                {/* Actions */}
+                <div className="space-y-2">
+                  <button
+                    onClick={handleManualCheck}
+                    disabled={isChecking}
+                    className="w-full py-3 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-bold text-xs transition-all shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isChecking ? (
+                      <Loader className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    <span>Tôi Đã Chuyển Khoản (Kiểm Tra Ngay)</span>
+                  </button>
+
+                  <button
+                    onClick={handleSimulatePayment}
+                    disabled={isChecking}
+                    className="w-full py-2.5 px-3 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-cyan-300 rounded-xl font-medium text-[11px] transition-colors flex items-center justify-center gap-1.5"
+                    title="Mô phỏng thanh toán thành công (hỗ trợ kiểm thử demo)"
+                  >
+                    <Zap className="w-3 h-3 text-yellow-400" />
+                    <span>⚡ Thử Nghiệm Mô Phỏng Thanh Toán (Demo/Test)</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

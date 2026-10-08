@@ -80,13 +80,20 @@ const UnsafeList = () => {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-3 text-sm">
+              <div className="flex flex-wrap items-center gap-2.5 text-sm">
+                <Link
+                  to="/report"
+                  className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-all flex items-center gap-2 text-xs shadow-lg shadow-red-600/30"
+                >
+                  <AlertOctagon className="w-4 h-4" />
+                  Gửi Báo Cáo Lừa Đảo
+                </Link>
                 <button
                   onClick={() => navigate('/chatbox')}
-                  className="px-4 py-2 rounded-xl bg-red-500/20 hover:bg-red-500 border border-red-500/30 text-red-300 hover:text-white font-semibold transition-all flex items-center gap-2 text-xs"
+                  className="px-4 py-2.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 hover:text-white font-semibold transition-all flex items-center gap-2 text-xs"
                 >
                   <Sparkles className="w-4 h-4" />
-                  Báo cáo / Kiểm tra với AI
+                  Kiểm tra với AI
                 </button>
               </div>
             </div>

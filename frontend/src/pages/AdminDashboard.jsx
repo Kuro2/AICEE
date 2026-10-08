@@ -127,7 +127,19 @@ const AdminDashboard = () => {
           <h2 className="text-xl font-bold text-white mb-2">Chức Năng Quản Lý Trực Quan</h2>
           <p className="text-gray-400 text-xs sm:text-sm mb-6">Truy cập nhanh các phân hệ nghiệp vụ chính của nền tảng.</p>
 
-          <div className="grid sm:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Link
+              to="/admin/reports"
+              className="p-5 rounded-2xl bg-red-500/10 hover:bg-red-500/15 border border-red-500/30 hover:border-red-500/50 transition-all group shadow-lg shadow-red-500/10"
+            >
+              <ShieldAlert className="w-6 h-6 text-red-400 mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-bold text-white text-sm mb-1 flex items-center justify-between">
+                <span>Duyệt Báo Cáo</span>
+                <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
+              </h3>
+              <p className="text-xs text-gray-300">Xác minh bằng chứng và thêm vào Blacklist.</p>
+            </Link>
+
             <Link
               to="/admin/users"
               className="p-5 rounded-2xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-cyan-500/40 transition-all group"
@@ -139,9 +151,9 @@ const AdminDashboard = () => {
 
             <Link
               to="/admin/resources"
-              className="p-5 rounded-2xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-red-500/40 transition-all group"
+              className="p-5 rounded-2xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-amber-500/40 transition-all group"
             >
-              <ShieldAlert className="w-6 h-6 text-red-400 mb-3 group-hover:scale-110 transition-transform" />
+              <AlertTriangle className="w-6 h-6 text-amber-400 mb-3 group-hover:scale-110 transition-transform" />
               <h3 className="font-bold text-white text-sm mb-1">Cơ Sở Dữ Liệu</h3>
               <p className="text-xs text-gray-400">Duyệt và cập nhật Whitelist, Blacklist nguy hại.</p>
             </Link>

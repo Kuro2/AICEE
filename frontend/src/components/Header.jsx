@@ -25,6 +25,7 @@ const Header = () => {
   const menuItems = [
     { name: 'Tin tức', path: '/news' },
     { name: 'Tài nguyên', path: '/resources' },
+    { name: 'Báo Cáo Lừa Đảo', path: '/report' },
     { name: 'Gói Cước', path: '/pricing' }
   ];
 

@@ -290,9 +290,73 @@ export const subscriptionAPI = {
   upgradePlan: (plan) => request('POST', '/subscription/upgrade', { plan })
 };
 
-// ── Payment API ──────────────────────────────────────────────
+// ── Payment API (SePay QR Banking) ───────────────────────────
 export const paymentAPI = {
-  create: async (planType, method = 'vnpay') => {
-    return request('POST', '/payment/create', { planType, method });
-  }
+  createOrder: (plan, billingCycle = 'monthly') =>
+    request('POST', '/payment/create-order', { plan, billingCycle }),
+
+  checkStatus: (orderCode) =>
+    request('GET', `/payment/check-status/${orderCode}`),
+
+  simulatePayment: (orderCode) =>
+    request('POST', `/payment/simulate/${orderCode}`),
+
+  getBankInfo: () =>
+    request('GET', '/payment/bank-info'),
+};
+
+// ── Report API ───────────────────────────────────────────────
+export const reportAPI = {
+  /**
+   * Gửi báo cáo lừa đảo mới (hỗ trợ FormData kèm files)
+   */
+  submit: async (formData) => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/reports`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || `Lỗi ${res.status}`);
+    }
+    return data;
+  },
+
+  /**
+   * Lấy danh sách báo cáo (Admin)
+   */
+  getAll: (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.append('page', params.page);
+    if (params.limit) searchParams.append('limit', params.limit);
+    if (params.status) searchParams.append('status', params.status);
+    if (params.type) searchParams.append('type', params.type);
+    if (params.search) searchParams.append('search', params.search);
+    const queryString = searchParams.toString();
+    return request('GET', `/reports${queryString ? `?${queryString}` : ''}`);
+  },
+
+  /**
+   * Lấy chi tiết báo cáo
+   */
+  getById: (id) => request('GET', `/reports/${id}`),
+
+  /**
+   * Admin duyệt báo cáo & tự động đưa vào blacklist
+   */
+  approve: (id, adminNote = '') => request('POST', `/reports/${id}/approve`, { adminNote }),
+
+  /**
+   * Admin từ chối báo cáo
+   */
+  reject: (id, adminNote = '') => request('POST', `/reports/${id}/reject`, { adminNote }),
+
+  /**
+   * Xóa báo cáo
+   */
+  delete: (id) => request('DELETE', `/reports/${id}`),
 };

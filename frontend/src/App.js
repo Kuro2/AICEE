@@ -19,6 +19,7 @@ import QuizFake from '@/pages/QuizFake';
 import QuizEmail from '@/pages/QuizEmail';
 import Pricing from '@/pages/Pricing';
 import AiHistory from '@/pages/AiHistory';
+import ReportScam from '@/pages/ReportScam';
 
 // Admin Pages
 import AdminLayout from '@/components/AdminLayout';
@@ -26,6 +27,7 @@ import AdminDashboard from '@/pages/AdminDashboard';
 import AdminUsers from '@/pages/AdminUsers';
 import AdminResources from '@/pages/AdminResources';
 import AdminNews from '@/pages/AdminNews';
+import AdminReports from '@/pages/AdminReports';
 
 function App() {
   return (
@@ -42,6 +44,7 @@ function App() {
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/chatbox" element={<ChatboxAI />} />
             <Route path="/ai-history" element={<AiHistory />} />
+            <Route path="/report" element={<ReportScam />} />
             <Route path="/resources" element={<Resources />} />
             <Route path="/resources/unsafe" element={<UnsafeList />} />
             <Route path="/resources/safe" element={<SafeList />} />
@@ -58,6 +61,7 @@ function App() {
               <Route path="users" element={<AdminUsers />} />
               <Route path="resources" element={<AdminResources />} />
               <Route path="news" element={<AdminNews />} />
+              <Route path="reports" element={<AdminReports />} />
             </Route>
           </Routes>
         </BrowserRouter>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Users, FileText, LayoutDashboard, ShieldAlert, LogOut, ArrowLeft, Sparkles, ShieldCheck } from 'lucide-react';
+import { Users, FileText, LayoutDashboard, ShieldAlert, LogOut, ArrowLeft, Sparkles, ShieldCheck, Flag } from 'lucide-react';
 import { authAPI } from '@/services/api';
 
 const AdminLayout = () => {
@@ -20,6 +20,7 @@ const AdminLayout = () => {
 
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { name: 'Duyệt Báo Cáo', path: '/admin/reports', icon: <Flag className="w-4 h-4" /> },
     { name: 'Người dùng', path: '/admin/users', icon: <Users className="w-4 h-4" /> },
     { name: 'Tin tức', path: '/admin/news', icon: <FileText className="w-4 h-4" /> },
     { name: 'Tài nguyên', path: '/admin/resources', icon: <ShieldAlert className="w-4 h-4" /> }
