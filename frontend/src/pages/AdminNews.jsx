@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { adminAPI, newsAPI } from '@/services/api';
-import { Trash2, Edit, Plus, Loader, Eye } from 'lucide-react';
+import { Trash2, Edit, Plus, Loader, Eye, X, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const AdminNews = () => {
@@ -139,21 +139,47 @@ const AdminNews = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-white/5 border border-white/10 rounded-2xl w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold text-white mb-6">{editingId ? 'Sửa bài viết' : 'Viết bài mới'}</h2>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-[#0f172a] border border-cyan-500/40 rounded-3xl w-full max-w-3xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto shadow-[0_25px_80px_rgba(0,0,0,0.95)] relative z-50">
+            {/* Header with Title and Close Button */}
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <h2 className="text-2xl font-bold text-white">
+                  {editingId ? 'Sửa bài viết' : 'Viết bài mới'}
+                </h2>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsModalOpen(false)} 
+                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-gray-400 hover:text-white transition-colors"
+                title="Đóng cửa sổ"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="text-sm text-gray-400 block mb-1">Tiêu đề bài viết</label>
-                  <input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} type="text" className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white" />
+                  <label className="text-sm font-medium text-gray-300 block mb-1.5">Tiêu đề bài viết</label>
+                  <input 
+                    required 
+                    value={formData.title} 
+                    onChange={e => setFormData({...formData, title: e.target.value})} 
+                    type="text" 
+                    placeholder="Nhập tiêu đề tin tức..."
+                    className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm" 
+                  />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-400 block mb-1">Danh mục</label>
+                  <label className="text-sm font-medium text-gray-300 block mb-1.5">Danh mục</label>
                   <select 
                     value={formData.category} 
                     onChange={(e) => setFormData({...formData, category: e.target.value})}
-                    className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white"
+                    className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm"
                   >
                     <option>Cảnh báo lừa đảo</option>
                     <option>Cập nhật sản phẩm</option>
@@ -164,25 +190,63 @@ const AdminNews = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm text-gray-400 block mb-1">Link Ảnh Bìa</label>
-                  <input required value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} type="text" className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white" placeholder="https://..." />
+                  <label className="text-sm font-medium text-gray-300 block mb-1.5">Link Ảnh Bìa</label>
+                  <input 
+                    required 
+                    value={formData.image} 
+                    onChange={e => setFormData({...formData, image: e.target.value})} 
+                    type="text" 
+                    className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm" 
+                    placeholder="https://images.unsplash.com/..." 
+                  />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-sm text-gray-400 block mb-1">Đoạn tóm tắt (Excerpt)</label>
-                  <textarea required value={formData.excerpt} onChange={e => setFormData({...formData, excerpt: e.target.value})} className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white h-20" />
+                  <label className="text-sm font-medium text-gray-300 block mb-1.5">Đoạn tóm tắt (Excerpt)</label>
+                  <textarea 
+                    required 
+                    rows={3}
+                    value={formData.excerpt} 
+                    onChange={e => setFormData({...formData, excerpt: e.target.value})} 
+                    placeholder="Tóm tắt ngắn gọn nội dung bài viết..."
+                    className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm" 
+                  />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-sm text-gray-400 block mb-1">Nội dung chi tiết</label>
-                  <textarea required value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white h-40" />
+                  <label className="text-sm font-medium text-gray-300 block mb-1.5">Nội dung chi tiết</label>
+                  <textarea 
+                    required 
+                    rows={7}
+                    value={formData.content} 
+                    onChange={e => setFormData({...formData, content: e.target.value})} 
+                    placeholder="Nội dung bài viết đầy đủ..."
+                    className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm" 
+                  />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-sm text-gray-400 block mb-1">Thẻ Tags (cách nhau bằng dấu phẩy)</label>
-                  <input value={formData.tags} onChange={e => setFormData({...formData, tags: e.target.value})} type="text" className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white" placeholder="AI, Bảo mật, Lừa đảo..." />
+                  <label className="text-sm font-medium text-gray-300 block mb-1.5">Thẻ Tags (cách nhau bằng dấu phẩy)</label>
+                  <input 
+                    value={formData.tags} 
+                    onChange={e => setFormData({...formData, tags: e.target.value})} 
+                    type="text" 
+                    className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm" 
+                    placeholder="AI, Bảo mật, Lừa đảo..." 
+                  />
                 </div>
               </div>
-              <div className="flex gap-3 mt-8">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-3 bg-white/10 text-white rounded-xl">Hủy</button>
-                <button type="submit" className="flex-1 p-3 bg-cyan-500 text-white rounded-xl font-bold">Lưu Bài Viết</button>
+              <div className="flex gap-3 pt-4 border-t border-slate-800">
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)} 
+                  className="flex-1 p-3.5 bg-slate-800 hover:bg-slate-700 text-gray-300 hover:text-white rounded-xl font-semibold transition-all"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 p-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-bold shadow-lg shadow-cyan-500/25 transition-all"
+                >
+                  Lưu Bài Viết
+                </button>
               </div>
             </form>
           </div>

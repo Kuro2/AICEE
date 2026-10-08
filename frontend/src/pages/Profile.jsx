@@ -3,8 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { 
-  User, Mail, Shield, Calendar, LogOut, Loader, ArrowLeft, 
-  Lock, Sparkles, CheckCircle2, ShieldAlert, Award, Zap,
+  User, Mail, Calendar, LogOut, Loader, ArrowLeft, 
+  Lock, Sparkles, CheckCircle2, ShieldAlert, Shield, Award, Zap,
   Edit3, Camera, Save, X, Eye, EyeOff, AlertCircle, Check, Upload
 } from 'lucide-react';
 import { authAPI, subscriptionAPI } from '@/services/api';
@@ -396,17 +396,7 @@ const Profile = () => {
               </div>
 
               {/* Security Status Bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center space-x-3.5">
-                  <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    <Shield className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-xs text-gray-400 font-medium">Điểm An Toàn</span>
-                    <p className="text-xl font-extrabold text-emerald-400">98 / 100</p>
-                  </div>
-                </div>
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                 <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center space-x-3.5">
                   <div className="p-3 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
                     <Zap className="w-5 h-5" />

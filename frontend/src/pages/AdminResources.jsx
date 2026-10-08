@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { adminAPI, resourceAPI } from '@/services/api';
-import { Trash2, Edit, Plus, Loader } from 'lucide-react';
+import { Trash2, Edit, Plus, Loader, X } from 'lucide-react';
 
 const AdminResources = () => {
   const [resources, setResources] = useState([]);
@@ -144,27 +144,39 @@ const AdminResources = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-white/5 border border-white/10 rounded-2xl w-full max-w-md p-6">
-            <h2 className="text-xl font-bold text-white mb-6">{editingId ? 'Sửa thông tin' : 'Thêm dữ liệu mới'}</h2>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-[#0f172a] border border-cyan-500/40 rounded-3xl w-full max-w-md p-6 sm:p-8 shadow-[0_25px_80px_rgba(0,0,0,0.95)] relative z-50">
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-800">
+              <h2 className="text-xl font-bold text-white">
+                {editingId ? 'Sửa thông tin' : 'Thêm dữ liệu mới'}
+              </h2>
+              <button 
+                type="button"
+                onClick={() => setIsModalOpen(false)} 
+                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-gray-400 hover:text-white transition-colors"
+                title="Đóng cửa sổ"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="text-sm text-gray-400 block mb-1">Loại danh sách</label>
+                <label className="text-sm font-medium text-gray-300 block mb-1.5">Loại danh sách</label>
                 <select 
                   value={formData.isSafe} 
                   onChange={(e) => setFormData({...formData, isSafe: e.target.value === 'true'})}
-                  className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white"
+                  className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm"
                 >
                   <option value="true">Danh sách An toàn</option>
                   <option value="false">Danh sách Cảnh báo (Lừa đảo)</option>
                 </select>
               </div>
               <div>
-                <label className="text-sm text-gray-400 block mb-1">Nền tảng</label>
+                <label className="text-sm font-medium text-gray-300 block mb-1.5">Nền tảng</label>
                 <select 
                   value={formData.type} 
                   onChange={(e) => setFormData({...formData, type: e.target.value})}
-                  className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white"
+                  className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm"
                 >
                   <option>Website</option>
                   <option>Tổ chức</option>
@@ -174,20 +186,51 @@ const AdminResources = () => {
                 </select>
               </div>
               <div>
-                <label className="text-sm text-gray-400 block mb-1">Tên tổ chức (Tùy chọn)</label>
-                <input required={formData.isSafe} value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white" />
+                <label className="text-sm font-medium text-gray-300 block mb-1.5">Tên tổ chức (Tùy chọn)</label>
+                <input 
+                  required={formData.isSafe} 
+                  value={formData.name} 
+                  onChange={e => setFormData({...formData, name: e.target.value})} 
+                  type="text" 
+                  placeholder="VD: Cổng Dịch vụ công Quốc gia..."
+                  className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm" 
+                />
               </div>
               <div>
-                <label className="text-sm text-gray-400 block mb-1">Địa chỉ / Link / SĐT</label>
-                <input required value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} type="text" className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white" />
+                <label className="text-sm font-medium text-gray-300 block mb-1.5">Địa chỉ / Link / SĐT</label>
+                <input 
+                  required 
+                  value={formData.address} 
+                  onChange={e => setFormData({...formData, address: e.target.value})} 
+                  type="text" 
+                  placeholder="VD: dichvucong.gov.vn hoặc 090..."
+                  className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm" 
+                />
               </div>
               <div>
-                <label className="text-sm text-gray-400 block mb-1">Mô tả</label>
-                <textarea required value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white h-24" />
+                <label className="text-sm font-medium text-gray-300 block mb-1.5">Mô tả</label>
+                <textarea 
+                  required 
+                  value={formData.description} 
+                  onChange={e => setFormData({...formData, description: e.target.value})} 
+                  placeholder="Mô tả chi tiết hoặc cảnh báo lừa đảo..."
+                  className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm h-24" 
+                />
               </div>
-              <div className="flex gap-3 mt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-3 bg-white/10 text-white rounded-xl">Hủy</button>
-                <button type="submit" className="flex-1 p-3 bg-cyan-500 text-white rounded-xl font-bold">Lưu lại</button>
+              <div className="flex gap-3 pt-4 border-t border-slate-800">
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)} 
+                  className="flex-1 p-3.5 bg-slate-800 hover:bg-slate-700 text-gray-300 hover:text-white rounded-xl font-semibold transition-all"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 p-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-bold shadow-lg shadow-cyan-500/25 transition-all"
+                >
+                  Lưu lại
+                </button>
               </div>
             </form>
           </div>

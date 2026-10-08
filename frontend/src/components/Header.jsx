@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Shield, Menu, X, Sparkles } from 'lucide-react';
+import { Shield, Menu, X, Sparkles, ShieldAlert } from 'lucide-react';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -25,7 +25,6 @@ const Header = () => {
   const menuItems = [
     { name: 'Tin tức', path: '/news' },
     { name: 'Tài nguyên', path: '/resources' },
-    { name: 'Báo Cáo Lừa Đảo', path: '/report' },
     { name: 'Gói Cước', path: '/pricing' }
   ];
 
@@ -73,11 +72,16 @@ const Header = () => {
           </nav>
 
           {/* Action Buttons */}
-          <div className="hidden md:flex items-center space-x-4">
-            <div className="flex items-center space-x-2 px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-red-400 font-medium text-xs uppercase tracking-widest">Trực tiếp</span>
-            </div>
+          <div className="hidden md:flex items-center space-x-3">
+            {/* Nút Báo Cáo phong cách nổi bật như nút Đăng nhập */}
+            <Link
+              to="/report"
+              className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl transition-all hover:shadow-[0_0_20px_rgba(239,68,68,0.4)] hover:scale-[1.02] active:scale-95 font-semibold text-sm flex items-center gap-1.5"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              Báo Cáo
+            </Link>
+
             <button 
               onClick={() => navigate('/chatbox')}
               className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:scale-[1.02] active:scale-95 transition-all font-semibold text-sm flex items-center gap-2"
@@ -86,7 +90,7 @@ const Header = () => {
               AI Tư vấn
             </button>
             {user ? (
-              <div className="flex items-center space-x-3 border-l border-white/10 pl-4">
+              <div className="flex items-center space-x-3 border-l border-white/10 pl-3">
                 <Link 
                   to="/profile" 
                   title="Xem trang cá nhân"
@@ -104,7 +108,7 @@ const Header = () => {
                 </Link>
                 <button 
                   onClick={handleLogout}
-                  className="px-4 py-2 text-gray-300 hover:text-red-400 transition-colors font-medium border border-transparent hover:border-red-500/30 rounded-lg text-sm"
+                  className="px-3.5 py-2 text-gray-300 hover:text-red-400 transition-colors font-medium border border-transparent hover:border-red-500/30 rounded-lg text-sm"
                 >
                   Đăng xuất
                 </button>
@@ -140,6 +144,13 @@ const Header = () => {
                 {item.name}
               </Link>
             ))}
+            <Link
+              to="/report"
+              className="w-full px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl transition-all font-semibold flex justify-center items-center gap-2"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              Báo Cáo Lừa Đảo
+            </Link>
             <button 
               onClick={() => navigate('/chatbox')}
               className="w-full px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl transition-all font-semibold flex justify-center items-center gap-2"
