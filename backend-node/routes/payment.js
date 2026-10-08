@@ -7,11 +7,11 @@ const { authenticate, optionalAuth, isAdmin } = require('../middleware/auth');
 
 // Cấu hình SePay từ biến môi trường
 const SEPAY_CONFIG = {
-  apiToken: process.env.SEPAY_API_TOKEN || 'HP7KCPUEXD7Z1RJMS5XSOK3WFY8NR301PAELLY0HGILH9OAGF6JZEUZITWXN82YG',
-  bankName: process.env.SEPAY_BANK_NAME || 'TPBank',
-  bankCode: process.env.SEPAY_BANK_CODE || 'TPB',
-  accountNumber: process.env.SEPAY_ACCOUNT_NUMBER || '10005920328',
-  accountHolder: process.env.SEPAY_ACCOUNT_HOLDER || 'TRAN TRUNG HAI',
+  apiToken: (process.env.SEPAY_API_TOKEN || 'HP7KCPUEXD7Z1RJMS5XSOK3WFY8NR301PAELLY0HGILH9OAGF6JZEUZITWXN82YG').trim(),
+  bankName: (process.env.SEPAY_BANK_NAME || 'TPBank').trim(),
+  bankCode: (process.env.SEPAY_BANK_CODE || 'TPB').trim(),
+  accountNumber: (process.env.SEPAY_ACCOUNT_NUMBER || '10005920328').trim(),
+  accountHolder: (process.env.SEPAY_ACCOUNT_HOLDER || 'TRAN TRUNG HAI').trim(),
   apiUrl: 'https://my.sepay.vn/userapi'
 };
 
@@ -171,18 +171,20 @@ router.get('/check-status/:orderCode', optionalAuth, async (req, res) => {
       const transactions = sepayRes.data?.transactions || [];
       console.log(`[SePay Check] Đang tra cứu SePay cho mã ${cleanCode}. Tổng số giao dịch trả về: ${transactions.length}`);
 
-      // Tìm giao dịch khớp với mã đơn hàng và số tiền
+      // Tìm giao dịch khớp với mã đơn hàng và số tiền (hỗ trợ cả format SePay API và Webhook)
       const matchedTx = transactions.find(tx => {
-        const content = `${tx.content || ''} ${tx.description || ''} ${tx.code || ''}`.toUpperCase();
-        const isInbound = tx.transferType === 'in' || Number(tx.transferAmount) > 0;
+        const content = `${tx.transaction_content || ''} ${tx.content || ''} ${tx.description || ''} ${tx.code || ''}`.toUpperCase();
+        const amountIn = Number(tx.amount_in || tx.transferAmount || tx.amount || 0);
+        const isInbound = tx.transferType === 'in' || amountIn > 0;
         const isCodeMatched = content.includes(cleanCode);
-        const isAmountMatched = Number(tx.transferAmount) >= Number(order.amount);
+        const isAmountMatched = amountIn >= Number(order.amount);
 
         return isInbound && isCodeMatched && isAmountMatched;
       });
 
       if (matchedTx) {
-        console.log(`[SePay Match!] Tìm thấy giao dịch SePay khớp: #${matchedTx.id} - ${matchedTx.transferAmount}đ cho mã ${cleanCode}`);
+        const matchedAmount = matchedTx.amount_in || matchedTx.transferAmount || matchedTx.amount;
+        console.log(`[SePay Match!] Tìm thấy giao dịch SePay khớp: #${matchedTx.id} - ${matchedAmount}đ cho mã ${cleanCode}`);
         await fulfillOrder(order, matchedTx);
 
         const user = await UserModel.findById(order.userId);
@@ -232,8 +234,8 @@ router.post('/sepay-webhook', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Dữ liệu webhook trống' });
     }
 
-    const content = `${data.content || ''} ${data.description || ''} ${data.code || ''}`.toUpperCase();
-    const transferAmount = Number(data.transferAmount || data.amount || 0);
+    const content = `${data.transaction_content || ''} ${data.content || ''} ${data.description || ''} ${data.code || ''}`.toUpperCase();
+    const transferAmount = Number(data.amount_in || data.transferAmount || data.amount || 0);
 
     // Trích xuất mã đơn hàng có định dạng AICEE + 6 số
     const match = content.match(/AICEE\d+/i);
