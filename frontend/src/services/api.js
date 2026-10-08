@@ -243,6 +243,28 @@ export const uploadAPI = {
     });
     return res.json();
   },
+
+  /**
+   * Upload 1 file ảnh (dùng cho ảnh bìa tin tức, banner...)
+   */
+  uploadImage: async (file) => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const res = await fetch(`${API_BASE}/upload/image`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || `Lỗi tải ảnh (${res.status})`);
+    }
+    return data;
+  },
 };
 
 // ── Health Check ──────────────────────────────────────────

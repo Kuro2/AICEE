@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { adminAPI, newsAPI } from '@/services/api';
-import { Trash2, Edit, Plus, Loader, Eye, X, FileText } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { adminAPI, newsAPI, uploadAPI } from '@/services/api';
+import { 
+  Trash2, Edit, Plus, Loader, Eye, X, FileText, 
+  Upload, Image as ImageIcon, CheckCircle2, AlertCircle, RefreshCw 
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const AdminNews = () => {
@@ -9,6 +12,12 @@ const AdminNews = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   
+  // Image upload states
+  const [imageInputMode, setImageInputMode] = useState('file'); // 'file' | 'url'
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const fileInputRef = useRef(null);
+
   const [formData, setFormData] = useState({
     title: '',
     category: 'Cập nhật sản phẩm',
@@ -35,11 +44,86 @@ const AdminNews = () => {
     }
   };
 
+  const handleImageFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setImageError('Vui lòng chọn file hình ảnh hợp lệ (PNG, JPG, WEBP, GIF)');
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      setImageError('Kích thước ảnh tối đa là 15MB');
+      return;
+    }
+
+    setImageError('');
+    setUploadingImage(true);
+
+    try {
+      // 1. Thử upload trực tiếp lên backend
+      const res = await uploadAPI.uploadImage(file);
+      if (res.success && res.data?.url) {
+        setFormData(prev => ({ ...prev, image: res.data.url }));
+        setUploadingImage(false);
+        return;
+      }
+    } catch (err) {
+      console.warn('Backend upload không khả dụng, chuyển sang xử lý tối ưu trên máy:', err);
+    }
+
+    // 2. Dự phòng: Tối ưu ảnh qua HTML5 Canvas và chuyển thành DataURL bền vững
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1200;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const optimizedUrl = canvas.toDataURL('image/jpeg', 0.85);
+        setFormData(prev => ({ ...prev, image: optimizedUrl }));
+        setUploadingImage(false);
+      };
+      img.onerror = () => {
+        setImageError('Không thể nạp file hình ảnh này');
+        setUploadingImage(false);
+      };
+      img.src = event.target.result;
+    };
+    reader.onerror = () => {
+      setImageError('Lỗi đọc file từ máy tính');
+      setUploadingImage(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.image || !formData.image.trim()) {
+      setImageError('Vui lòng chọn ảnh bìa từ máy hoặc nhập link ảnh!');
+      return;
+    }
+
     const dataToSend = {
       ...formData,
-      tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean)
+      tags: typeof formData.tags === 'string' 
+        ? formData.tags.split(',').map(t => t.trim()).filter(Boolean)
+        : formData.tags
     };
 
     try {
@@ -83,12 +167,17 @@ const AdminNews = () => {
       tags: item.tags ? item.tags.join(', ') : ''
     });
     setEditingId(item.id);
+    setImageError('');
+    setImageInputMode(item.image?.startsWith('data:') ? 'file' : (item.image?.startsWith('http') ? 'url' : 'file'));
     setIsModalOpen(true);
   };
 
   const resetForm = () => {
     setFormData({ title: '', category: 'Cập nhật sản phẩm', image: '', excerpt: '', content: '', tags: '' });
     setEditingId(null);
+    setImageError('');
+    setImageInputMode('file');
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   if (loading) return <div className="text-white text-center py-20"><Loader className="w-8 h-8 animate-spin mx-auto" /></div>;
@@ -189,17 +278,164 @@ const AdminNews = () => {
                     <option>Hướng dẫn</option>
                   </select>
                 </div>
+
                 <div>
-                  <label className="text-sm font-medium text-gray-300 block mb-1.5">Link Ảnh Bìa</label>
+                  <label className="text-sm font-medium text-gray-300 block mb-1.5">Thẻ Tags (cách nhau dấu phẩy)</label>
                   <input 
-                    required 
-                    value={formData.image} 
-                    onChange={e => setFormData({...formData, image: e.target.value})} 
+                    value={formData.tags} 
+                    onChange={e => setFormData({...formData, tags: e.target.value})} 
                     type="text" 
                     className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm" 
-                    placeholder="https://images.unsplash.com/..." 
+                    placeholder="AI, Bảo mật, Cảnh báo..." 
                   />
                 </div>
+
+                {/* ── KHU VỰC ẢNH BÌA: TẢI TỪ MÁY HOẶC NHẬP URL ── */}
+                <div className="col-span-2 bg-[#0b1329]/80 border border-slate-800 p-4 rounded-2xl">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <label className="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-cyan-400" />
+                      Ảnh Bìa Bài Viết (Cover Image)
+                      <span className="text-red-400">*</span>
+                    </label>
+
+                    <div className="flex bg-[#1e293b] p-1 rounded-xl border border-slate-700">
+                      <button
+                        type="button"
+                        onClick={() => setImageInputMode('file')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                          imageInputMode === 'file'
+                            ? 'bg-cyan-500 text-white shadow-[0_0_12px_rgba(6,182,212,0.4)]'
+                            : 'text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        Tải ảnh từ máy
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setImageInputMode('url')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                          imageInputMode === 'url'
+                            ? 'bg-cyan-500 text-white shadow-[0_0_12px_rgba(6,182,212,0.4)]'
+                            : 'text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        🔗 Dán link URL
+                      </button>
+                    </div>
+                  </div>
+
+                  {imageError && (
+                    <div className="mb-3 p-3 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-2 text-red-300 text-xs">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{imageError}</span>
+                    </div>
+                  )}
+
+                  {imageInputMode === 'file' ? (
+                    <div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageFileChange}
+                        className="hidden"
+                      />
+                      {!formData.image ? (
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          className="border-2 border-dashed border-slate-700 hover:border-cyan-500/70 bg-[#1e293b]/60 hover:bg-[#1e293b] rounded-xl p-6 text-center cursor-pointer transition-all group"
+                        >
+                          {uploadingImage ? (
+                            <div className="flex flex-col items-center justify-center py-2">
+                              <Loader className="w-8 h-8 text-cyan-400 animate-spin mb-2" />
+                              <p className="text-sm text-cyan-300 font-semibold">Đang xử lý và tải ảnh bìa...</p>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center mb-2.5 group-hover:scale-110 group-hover:bg-cyan-500/20 transition-all">
+                                <Upload className="w-6 h-6" />
+                              </div>
+                              <p className="text-sm text-white font-semibold mb-1">
+                                Nhấp vào đây để chọn ảnh từ máy tính của bạn
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                Hỗ trợ PNG, JPG, JPEG, WEBP, GIF (Tối đa 15MB)
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div>
+                      <input 
+                        value={formData.image} 
+                        onChange={e => {
+                          setFormData({...formData, image: e.target.value});
+                          setImageError('');
+                        }} 
+                        type="text" 
+                        className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm mb-1" 
+                        placeholder="https://images.unsplash.com/photo-..." 
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Dán liên kết ảnh trực tiếp từ internet (Unsplash, Imgur, Cloudinary...)</p>
+                    </div>
+                  )}
+
+                  {/* Xem trước ảnh bìa (Cover Image Preview) */}
+                  {formData.image && (
+                    <div className="mt-3 p-3 bg-[#1e293b] border border-cyan-500/30 rounded-xl flex items-center gap-4">
+                      <div className="w-28 h-18 sm:w-32 sm:h-20 rounded-lg overflow-hidden border border-slate-700 bg-black/40 shrink-0 relative">
+                        <img 
+                          src={formData.image} 
+                          alt="Cover preview" 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.src = 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=400&q=80';
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold mb-1">
+                          <CheckCircle2 className="w-4 h-4 shrink-0" />
+                          <span>Ảnh bìa đã chọn thành công</span>
+                        </div>
+                        <p className="text-xs text-gray-300 truncate">
+                          {formData.image.startsWith('data:') 
+                            ? 'Ảnh tải trực tiếp từ máy tính (Đã nén tối ưu hiển thị)' 
+                            : formData.image}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImageInputMode('file');
+                            setTimeout(() => fileInputRef.current?.click(), 50);
+                          }}
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 border border-slate-700 hover:border-cyan-500/40"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          Đổi ảnh
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({...formData, image: ''});
+                            if (fileInputRef.current) fileInputRef.current.value = '';
+                          }}
+                          className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors border border-red-500/20"
+                          title="Xóa ảnh bìa"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="col-span-2">
                   <label className="text-sm font-medium text-gray-300 block mb-1.5">Đoạn tóm tắt (Excerpt)</label>
                   <textarea 
@@ -211,6 +447,7 @@ const AdminNews = () => {
                     className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm" 
                   />
                 </div>
+
                 <div className="col-span-2">
                   <label className="text-sm font-medium text-gray-300 block mb-1.5">Nội dung chi tiết</label>
                   <textarea 
@@ -220,16 +457,6 @@ const AdminNews = () => {
                     onChange={e => setFormData({...formData, content: e.target.value})} 
                     placeholder="Nội dung bài viết đầy đủ..."
                     className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm" 
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-sm font-medium text-gray-300 block mb-1.5">Thẻ Tags (cách nhau bằng dấu phẩy)</label>
-                  <input 
-                    value={formData.tags} 
-                    onChange={e => setFormData({...formData, tags: e.target.value})} 
-                    type="text" 
-                    className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm" 
-                    placeholder="AI, Bảo mật, Lừa đảo..." 
                   />
                 </div>
               </div>

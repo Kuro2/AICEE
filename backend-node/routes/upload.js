@@ -51,6 +51,43 @@ const upload = multer({
 });
 
 /**
+ * @route   POST /api/upload/image
+ * @desc    Upload 1 file ảnh độc lập (cho ảnh bìa bài viết, banner, avatar...)
+ * @access  Public / OptionalAuth
+ */
+router.post('/image', optionalAuth, upload.single('image'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng chọn file hình ảnh'
+      });
+    }
+
+    const host = req.get('host');
+    const protocol = req.protocol;
+    // Hỗ trợ cả full URL và relative URL
+    const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+
+    res.json({
+      success: true,
+      message: 'Tải ảnh thành công',
+      data: {
+        url: fileUrl,
+        relativePath: `/uploads/${req.file.filename}`,
+        filename: req.file.filename,
+        size: req.file.size
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Lỗi khi upload ảnh'
+    });
+  }
+});
+
+/**
  * @route   POST /api/upload
  * @desc    Upload file, phân tích bằng AI và lưu vào lịch sử Chat
  * @access  Public
