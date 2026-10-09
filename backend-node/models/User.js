@@ -10,9 +10,11 @@ const userSchema = new mongoose.Schema({
   lastLogin: { type: Date, default: null },
   googleId: { type: String, default: null },
   facebookId: { type: String, default: null },
-  plan: { type: String, enum: ['free', 'premium'], default: 'free' },
-  planExpiry: { type: Date, default: null },
-  chatLimit: { type: Number, default: 10 }
+  // Các trường phục vụ chức năng đăng ký (Subscription)
+  plan: { type: String, enum: ['free', 'premium', 'business', 'api', 'platform-api'], default: 'free' },
+  scanCount: { type: Number, default: 0 },
+  lastScanReset: { type: Date, default: null },
+  subscriptionExpires: { type: Date, default: null }
 }, {
   timestamps: true
 });
@@ -22,13 +24,18 @@ const UserModel = mongoose.models.User || mongoose.model('User', userSchema);
 // Đảm bảo tương thích ngược với API hiện tại (trả về id thay vì _id)
 function formatUser(userDoc) {
   if (!userDoc) return null;
-  const obj = userDoc.toObject ? userDoc.toObject() : { ...userDoc };
-  obj.id = (obj._id || obj.id || '').toString();
+  const obj = userDoc.toObject ? userDoc.toObject() : userDoc;
+  obj.id = obj._id ? obj._id.toString() : obj.id;
   delete obj._id;
   delete obj.__v;
-  // Tính toán trạng thái Premium còn hạn
-  const isPrem = obj.plan === 'premium' && (!obj.planExpiry || new Date(obj.planExpiry) > new Date());
-  obj.isPremium = isPrem;
+  // Cung cấp cờ hasPassword và socialProvider để frontend hiển thị đúng UX
+  obj.hasPassword = !!obj.password;
+  obj.isSocialAccount = !!(obj.googleId || obj.facebookId);
+  obj.socialProvider = obj.googleId ? 'Google' : (obj.facebookId ? 'Facebook' : null);
+  delete obj.password;
+  // Mặc định gói Free và số lượt quét nếu chưa có trong DB
+  if (!obj.plan) obj.plan = 'free';
+  if (obj.scanCount === undefined || obj.scanCount === null) obj.scanCount = 0;
   return obj;
 }
 
@@ -101,7 +108,7 @@ async function verifyLogin(email, password) {
 async function updateUser(id, updates) {
   if (!mongoose.Types.ObjectId.isValid(id)) return null;
   const { id: _id, email, password, ...safeUpdates } = updates;
-  
+
   const user = await UserModel.findByIdAndUpdate(id, safeUpdates, { new: true });
   const userObj = formatUser(user);
   if (userObj) delete userObj.password;
@@ -111,10 +118,10 @@ async function updateUser(id, updates) {
 async function findOrCreateSocialUser(profile) {
   try {
     const { email, name, avatar, provider, providerId } = profile;
-    
+
     // Tìm user bằng email
     let user = await UserModel.findOne({ email: email.toLowerCase() });
-    
+
     if (user) {
       // Nếu user đã tồn tại, cập nhật providerId nếu chưa có
       if (provider === 'google' && !user.googleId) {
@@ -122,7 +129,7 @@ async function findOrCreateSocialUser(profile) {
       } else if (provider === 'facebook' && !user.facebookId) {
         user.facebookId = providerId;
       }
-      
+
       // Cập nhật avatar nếu user chưa có
       if (avatar && !user.avatar) {
         user.avatar = avatar;
@@ -132,7 +139,7 @@ async function findOrCreateSocialUser(profile) {
       if (name && !user.name) {
         user.name = name;
       }
-      
+
       user.lastLogin = new Date();
       await user.save();
     } else {
@@ -157,12 +164,12 @@ async function findOrCreateSocialUser(profile) {
   }
 }
 
-module.exports = { 
-  UserModel, 
-  findUserByEmail, 
-  findUserById, 
-  createUser, 
-  verifyLogin, 
+module.exports = {
+  UserModel,
+  findUserByEmail,
+  findUserById,
+  createUser,
+  verifyLogin,
   updateUser,
   findOrCreateSocialUser
 };

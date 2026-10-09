@@ -18,9 +18,18 @@ import Profile from '@/pages/Profile';
 import QuizFake from '@/pages/QuizFake';
 import QuizEmail from '@/pages/QuizEmail';
 import Pricing from '@/pages/Pricing';
+import AiHistory from '@/pages/AiHistory';
+import ReportScam from '@/pages/ReportScam';
 import PaymentSuccess from '@/pages/PaymentSuccess';
 import PaymentFailed from '@/pages/PaymentFailed';
-import CheckoutSimulator from '@/pages/CheckoutSimulator';
+
+// Admin Pages
+import AdminLayout from '@/components/AdminLayout';
+import AdminDashboard from '@/pages/AdminDashboard';
+import AdminUsers from '@/pages/AdminUsers';
+import AdminResources from '@/pages/AdminResources';
+import AdminNews from '@/pages/AdminNews';
+import AdminReports from '@/pages/AdminReports';
 
 function App() {
   return (
@@ -28,16 +37,20 @@ function App() {
       <div className="App">
         <BrowserRouter>
           <Routes>
+            {/* User Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/news" element={<News />} />
             <Route path="/news/:id" element={<NewsDetail />} />
             <Route path="/login" element={<Login />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/chatbox" element={<ChatboxAI />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/payment/success" element={<PaymentSuccess />} />
             <Route path="/payment/failed" element={<PaymentFailed />} />
-            <Route path="/payment/checkout-simulator" element={<CheckoutSimulator />} />
+            <Route path="/payment/cancel" element={<PaymentFailed />} />
+            <Route path="/payment/error" element={<PaymentFailed />} />
+            <Route path="/chatbox" element={<ChatboxAI />} />
+            <Route path="/ai-history" element={<AiHistory />} />
+            <Route path="/report" element={<ReportScam />} />
             <Route path="/resources" element={<Resources />} />
             <Route path="/resources/unsafe" element={<UnsafeList />} />
             <Route path="/resources/safe" element={<SafeList />} />
@@ -47,6 +60,15 @@ function App() {
             <Route path="/resources/privacy" element={<PrivacyPolicy />} />
             <Route path="/quiz/fake" element={<QuizFake />} />
             <Route path="/quiz/email" element={<QuizEmail />} />
+
+            {/* Admin Routes */}
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="resources" element={<AdminResources />} />
+              <Route path="news" element={<AdminNews />} />
+              <Route path="reports" element={<AdminReports />} />
+            </Route>
           </Routes>
         </BrowserRouter>
       </div>

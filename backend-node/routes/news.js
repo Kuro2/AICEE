@@ -137,4 +137,56 @@ router.post('/subscribe', async (req, res) => {
   }
 });
 
+const News = require('../models/News');
+const { authenticate, isAdmin } = require('../middleware/auth');
+
+/**
+ * @route   POST /api/news
+ * @desc    Tạo tin tức mới
+ * @access  Private/Admin
+ */
+router.post('/', authenticate, isAdmin, async (req, res) => {
+  try {
+    const newNews = new News({
+      ...req.body,
+      author: req.body.author || 'AICEE Team',
+      date: new Date().toLocaleDateString('vi-VN')
+    });
+    await newNews.save();
+    res.json({ success: true, message: 'Đã thêm tin tức', data: newNews });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi thêm tin tức' });
+  }
+});
+
+/**
+ * @route   PUT /api/news/:id
+ * @desc    Cập nhật tin tức
+ * @access  Private/Admin
+ */
+router.put('/:id', authenticate, isAdmin, async (req, res) => {
+  try {
+    const updated = await News.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+    if (!updated) return res.status(404).json({ success: false, message: 'Không tìm thấy bài viết' });
+    res.json({ success: true, message: 'Đã cập nhật', data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi cập nhật tin tức' });
+  }
+});
+
+/**
+ * @route   DELETE /api/news/:id
+ * @desc    Xóa tin tức
+ * @access  Private/Admin
+ */
+router.delete('/:id', authenticate, isAdmin, async (req, res) => {
+  try {
+    const deleted = await News.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ success: false, message: 'Không tìm thấy bài viết' });
+    res.json({ success: true, message: 'Đã xóa tin tức' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi xóa tin tức' });
+  }
+});
+
 module.exports = router;

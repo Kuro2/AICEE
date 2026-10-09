@@ -25,7 +25,9 @@ async function request(method, path, body = null) {
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.message || `HTTP ${res.status}`);
+      const error = new Error(data.message || `HTTP ${res.status}`);
+      error.data = data;
+      throw error;
     }
     return data;
   } catch (err) {
@@ -91,6 +93,26 @@ export const authAPI = {
   getMe: () => request('GET', '/auth/me'),
 
   /**
+   * Cập nhật thông tin profile
+   * @param {Object} data - { name, avatar }
+   */
+  updateProfile: async (data) => {
+    const res = await request('PUT', '/auth/profile', data);
+    if (res.success && res.data?.user) {
+      const currentUser = authAPI.getCurrentUser() || {};
+      const updated = { ...currentUser, ...res.data.user };
+      localStorage.setItem('aicee_user', JSON.stringify(updated));
+    }
+    return res;
+  },
+
+  /**
+   * Đổi mật khẩu
+   * @param {Object} data - { currentPassword, newPassword }
+   */
+  changePassword: (data) => request('PUT', '/auth/change-password', data),
+
+  /**
    * Đăng xuất, xóa token
    */
   logout: () => {
@@ -135,7 +157,20 @@ export const chatAPI = {
   getHistory: (sessionId) => request('GET', `/chat/history/${sessionId}`),
 
   /**
-   * Xóa lịch sử chat
+   * Lấy danh sách dòng thời gian Nhật ký tư vấn AI kèm thống kê
+   */
+  getFeed: (sessionId = null) => {
+    const q = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : '';
+    return request('GET', `/chat/feed${q}`);
+  },
+
+  /**
+   * Xóa một mục trong nhật ký tư vấn
+   */
+  deleteItem: (id) => request('DELETE', `/chat/message/${id}`),
+
+  /**
+   * Xóa toàn bộ lịch sử chat
    */
   clearHistory: (sessionId) =>
     request('DELETE', `/chat/history/${sessionId}`),
@@ -236,21 +271,52 @@ export const newsAPI = {
 
 export const uploadAPI = {
   /**
-   * Upload và phân tích files
+   * Upload và phân tích files kèm lưu lịch sử chat
    * @param {FileList|File[]} files
+   * @param {string|null} sessionId
+   * @param {string} message
+   * @param {Array} previews
    */
-  analyze: async (files) => {
+  analyze: async (files, sessionId = null, message = '', previews = []) => {
     const formData = new FormData();
     Array.from(files).forEach((file) => formData.append('files', file));
+    if (sessionId) formData.append('sessionId', sessionId);
+    if (message) formData.append('message', message);
+    if (previews && previews.length > 0) {
+      formData.append('previews', JSON.stringify(previews));
+    }
 
+    const token = getToken();
     const res = await fetch(`${API_BASE}/upload`, {
       method: 'POST',
       headers: {
-        ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: formData,
     });
     return res.json();
+  },
+
+  /**
+   * Upload 1 file ảnh (dùng cho ảnh bìa tin tức, banner...)
+   */
+  uploadImage: async (file) => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const res = await fetch(`${API_BASE}/upload/image`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || `Lỗi tải ảnh (${res.status})`);
+    }
+    return data;
   },
 };
 
@@ -273,5 +339,105 @@ export const resourceAPI = {
       url += `?isSafe=${isSafe}`;
     }
     return request('GET', url);
-  }
+  },
+  
+  createResource: (data) => request('POST', '/resources', data),
+  updateResource: (id, data) => request('PUT', `/resources/${id}`, data),
+  deleteResource: (id) => request('DELETE', `/resources/${id}`),
+};
+
+// ── Admin API ─────────────────────────────────────────────
+export const adminAPI = {
+  getStats: () => request('GET', '/admin/stats'),
+  getUsers: (page = 1, limit = 20) => request('GET', `/admin/users?page=${page}&limit=${limit}`),
+  changeUserRole: (id, role) => request('PUT', `/admin/users/${id}/role`, { role }),
+  deleteUser: (id) => request('DELETE', `/admin/users/${id}`),
+  
+  // Admin News CRUD (calls the new protected news endpoints)
+  createNews: (data) => request('POST', '/news', data),
+  updateNews: (id, data) => request('PUT', `/news/${id}`, data),
+  deleteNews: (id) => request('DELETE', `/news/${id}`)
+};
+
+// ── Subscription API ──────────────────────────────────────
+export const subscriptionAPI = {
+  getSubscription: () => request('GET', '/subscription'),
+  upgradePlan: (plan) => request('POST', '/subscription/upgrade', { plan })
+};
+
+// ── Payment API (SePay QR Banking) ───────────────────────────
+export const paymentAPI = {
+  createOrder: (plan, billingCycle = 'monthly') =>
+    request('POST', '/payment/create-order', { plan, billingCycle }),
+
+  checkStatus: (orderCode) =>
+    request('GET', `/payment/check-status/${orderCode}`),
+
+  simulatePayment: (orderCode) =>
+    request('POST', `/payment/simulate/${orderCode}`),
+
+  getBankInfo: () =>
+    request('GET', '/payment/bank-info'),
+
+  create: (planType) => request('POST', '/payment/create', { planType }),
+  getOrderDetail: (orderId) => request('GET', `/payment/order/${orderId}`),
+  getHistory: () => request('GET', '/payment/history'),
+  simulate: (orderId, status = 'success') =>
+    request('POST', '/payment/simulate', { orderId, status }),
+};
+
+// ── Report API ───────────────────────────────────────────────
+export const reportAPI = {
+  /**
+   * Gửi báo cáo lừa đảo mới (hỗ trợ FormData kèm files)
+   */
+  submit: async (formData) => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/reports`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || `Lỗi ${res.status}`);
+    }
+    return data;
+  },
+
+  /**
+   * Lấy danh sách báo cáo (Admin)
+   */
+  getAll: (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.append('page', params.page);
+    if (params.limit) searchParams.append('limit', params.limit);
+    if (params.status) searchParams.append('status', params.status);
+    if (params.type) searchParams.append('type', params.type);
+    if (params.search) searchParams.append('search', params.search);
+    const queryString = searchParams.toString();
+    return request('GET', `/reports${queryString ? `?${queryString}` : ''}`);
+  },
+
+  /**
+   * Lấy chi tiết báo cáo
+   */
+  getById: (id) => request('GET', `/reports/${id}`),
+
+  /**
+   * Admin duyệt báo cáo & tự động đưa vào blacklist
+   */
+  approve: (id, adminNote = '') => request('POST', `/reports/${id}/approve`, { adminNote }),
+
+  /**
+   * Admin từ chối báo cáo
+   */
+  reject: (id, adminNote = '') => request('POST', `/reports/${id}/reject`, { adminNote }),
+
+  /**
+   * Xóa báo cáo
+   */
+  delete: (id) => request('DELETE', `/reports/${id}`),
 };

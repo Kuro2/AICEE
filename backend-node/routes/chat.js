@@ -1,20 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const { sendToGemini, analyzeFile } = require('../services/aiService');
-const { optionalAuth, authenticate } = require('../middleware/auth');
-const { requirePremium } = require('../middleware/checkPremium');
-const { ChatHistoryModel } = require('../models/ChatHistory');
+const { optionalAuth } = require('../middleware/auth');
+const { checkScanLimit } = require('../middleware/subscription');
+const ChatMessage = require('../models/ChatMessage');
 
-// Lưu lịch sử chat trong memory (cho user vãng lai hoặc free)
-const chatHistories = new Map();
-const MAX_HISTORY_LENGTH = 20;
+// Cache in-memory theo session để dự phòng
+const memoryChatHistories = new Map();
 
 /**
  * @route   POST /api/chat
- * @desc    Gửi tin nhắn tới AI và nhận phản hồi
- * @access  Public (có optionalAuth)
+ * @desc    Gửi tin nhắn tới AI và lưu trữ lịch sử
+ * @access  Public (tự động liên kết userId nếu đã đăng nhập)
  */
-router.post('/', optionalAuth, async (req, res) => {
+router.post('/', optionalAuth, checkScanLimit, async (req, res) => {
   try {
     const { message, sessionId, files } = req.body;
 
@@ -25,18 +24,34 @@ router.post('/', optionalAuth, async (req, res) => {
       });
     }
 
-    // Tạo session ID nếu chưa có
-    const sid = sessionId || (req.user ? `user-${req.user.id}-${Date.now()}` : `guest-${Date.now()}`);
+    // Xác định session ID & user ID
+    const sid = sessionId || (req.user ? `user-${req.user.id}` : `guest-${Date.now()}`);
+    const userId = req.user ? req.user.id : null;
 
-    // Lấy lịch sử chat bộ nhớ tạm
-    if (!chatHistories.has(sid)) {
-      chatHistories.set(sid, []);
+    // Lấy lịch sử gần nhất để làm ngữ cảnh cho AI
+    let contextHistory = [];
+    try {
+      const recentDocs = await ChatMessage.find({
+        $or: [
+          { sessionId: sid },
+          ...(userId ? [{ userId }] : [])
+        ]
+      })
+      .sort({ createdAt: -1 })
+      .limit(16);
+
+      // Đảo ngược về thứ tự thời gian cũ -> mới
+      contextHistory = recentDocs.reverse().map(d => ({
+        role: d.type === 'user' ? 'user' : 'model',
+        content: d.text
+      }));
+    } catch (dbErr) {
+      console.warn('Không thể đọc ngữ cảnh từ DB, dùng memory:', dbErr.message);
+      contextHistory = memoryChatHistories.get(sid) || [];
     }
-    const history = chatHistories.get(sid);
 
+    // Xử lý phản hồi AI
     let aiResponse;
-
-    // Nếu có file đính kèm
     if (files && files.length > 0) {
       const fileResults = await Promise.all(
         files.map(f => analyzeFile(f.name, f.type, f.content))
@@ -48,63 +63,51 @@ router.post('/', optionalAuth, async (req, res) => {
         recommendations: [...new Set(fileResults.flatMap(r => r.recommendations || []))]
       };
     } else {
-      // Gửi tin nhắn text tới AI
-      aiResponse = await sendToGemini(message, history);
+      aiResponse = await sendToGemini(message, contextHistory);
     }
 
-    // Thêm vào lịch sử memory
-    if (message) {
-      history.push({ role: 'user', content: message });
+    const userText = message || (files?.length ? `Đã gửi ${files.length} tệp để phân tích` : '');
+    const aiText = aiResponse.text;
+
+    // Lưu vào MongoDB
+    let savedAiId = Date.now();
+    try {
+      await ChatMessage.create({
+        userId,
+        sessionId: sid,
+        type: 'user',
+        text: userText,
+        files: files ? files.map(f => ({ name: f.name, type: f.type, size: f.size, preview: f.preview })) : []
+      });
+
+      const aiMsgDoc = await ChatMessage.create({
+        userId,
+        sessionId: sid,
+        type: 'ai',
+        text: aiText,
+        status: aiResponse.status || 'info',
+        recommendations: aiResponse.recommendations || []
+      });
+      savedAiId = aiMsgDoc._id;
+    } catch (saveErr) {
+      console.warn('Lỗi lưu tin nhắn vào MongoDB:', saveErr.message);
     }
-    history.push({ role: 'model', content: aiResponse.text });
 
-    if (history.length > MAX_HISTORY_LENGTH * 2) {
-      history.splice(0, 2);
-    }
-
-    // Nếu user là Premium: Lưu trực tiếp vào MongoDB ChatHistory
-    let savedToDB = false;
-    if (req.user && req.user.isPremium) {
-      try {
-        const userMsg = {
-          role: 'user',
-          text: message || (files ? `[Gửi ${files.length} file đính kèm]` : ''),
-          status: 'info',
-          timestamp: new Date()
-        };
-
-        const aiMsg = {
-          role: 'ai',
-          text: aiResponse.text || '',
-          status: aiResponse.status || 'info',
-          recommendations: aiResponse.recommendations || [],
-          timestamp: new Date()
-        };
-
-        const titleText = message ? (message.length > 45 ? `${message.substring(0, 45)}...` : message) : 'Phân tích tài liệu';
-
-        await ChatHistoryModel.findOneAndUpdate(
-          { userId: req.user.id, sessionId: sid },
-          {
-            $push: { messages: { $each: [userMsg, aiMsg] } },
-            $setOnInsert: { title: titleText, isArchived: false }
-          },
-          { upsert: true, new: true }
-        );
-        savedToDB = true;
-      } catch (dbErr) {
-        console.error('Lỗi lưu lịch sử chat vào DB:', dbErr);
-      }
-    }
+    // Cập nhật bộ nhớ đệm memory
+    if (!memoryChatHistories.has(sid)) memoryChatHistories.set(sid, []);
+    const memHist = memoryChatHistories.get(sid);
+    memHist.push({ role: 'user', content: userText });
+    memHist.push({ role: 'model', content: aiText });
+    if (memHist.length > 30) memHist.splice(0, 2);
 
     res.json({
       success: true,
       data: {
-        message: aiResponse.text,
+        id: savedAiId,
+        message: aiText,
         status: aiResponse.status || 'info',
         recommendations: aiResponse.recommendations || [],
         sessionId: sid,
-        savedToDB,
         timestamp: new Date().toISOString()
       }
     });
@@ -122,180 +125,195 @@ router.post('/', optionalAuth, async (req, res) => {
 });
 
 /**
- * @route   GET /api/chat/sessions
- * @desc    Lấy danh sách các phiên chat đã lưu của tài khoản Premium
- * @access  Private (Premium Only)
+ * @route   GET /api/chat/history/:sessionId
+ * @desc    Lấy lịch sử chat đã lưu theo sessionId và userId
+ * @access  Public (nhận diện theo token nếu có)
  */
-router.get('/sessions', authenticate, requirePremium, async (req, res) => {
-  try {
-    const sessions = await ChatHistoryModel.find({
-      userId: req.user.id,
-      isArchived: false
-    })
-      .select('sessionId title createdAt updatedAt messages')
-      .sort({ updatedAt: -1 })
-      .lean();
+router.get('/history/:sessionId', optionalAuth, async (req, res) => {
+  const { sessionId } = req.params;
+  const userId = req.user ? req.user.id : null;
 
-    const formattedSessions = sessions.map(s => ({
-      id: s._id,
-      sessionId: s.sessionId,
-      title: s.title || 'Cuộc trò chuyện mới',
-      messageCount: s.messages ? s.messages.length : 0,
-      lastMessage: s.messages && s.messages.length > 0 ? s.messages[s.messages.length - 1].text.substring(0, 60) : '',
-      createdAt: s.createdAt,
-      updatedAt: s.updatedAt
+  try {
+    const filter = {
+      $or: [
+        { sessionId },
+        ...(userId ? [{ userId }] : [])
+      ]
+    };
+
+    const docs = await ChatMessage.find(filter)
+      .sort({ createdAt: 1 })
+      .limit(100);
+
+    const history = docs.map(d => ({
+      id: d._id.toString(),
+      type: d.type,
+      text: d.text,
+      status: d.status,
+      recommendations: d.recommendations || [],
+      files: d.files || [],
+      timestamp: d.createdAt
     }));
 
     res.json({
       success: true,
-      data: { sessions: formattedSessions }
+      data: {
+        sessionId,
+        history,
+        messageCount: history.length
+      }
     });
-  } catch (error) {
-    console.error('Get chat sessions error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Không thể tải danh sách phiên trò chuyện'
+  } catch (err) {
+    console.error('Lỗi lấy lịch sử chat:', err);
+    // Dự phòng memory nếu lỗi MongoDB
+    const fallback = memoryChatHistories.get(sessionId) || [];
+    res.json({
+      success: true,
+      data: {
+        sessionId,
+        history: fallback.map((h, i) => ({
+          id: i,
+          type: h.role === 'user' ? 'user' : 'ai',
+          text: h.content,
+          timestamp: new Date()
+        })),
+        messageCount: fallback.length
+      }
     });
   }
 });
 
 /**
- * @route   GET /api/chat/sessions/:sessionId
- * @desc    Lấy toàn bộ tin nhắn của 1 phiên chat đã lưu
- * @access  Private (Premium Only)
+ * @route   GET /api/chat/feed
+ * @desc    Lấy danh sách dòng thời gian (Timeline) các lần tư vấn/phân tích AI kèm thống kê
+ * @access  Public (nhận diện theo token nếu có)
  */
-router.get('/sessions/:sessionId', authenticate, requirePremium, async (req, res) => {
-  try {
-    const session = await ChatHistoryModel.findOne({
-      userId: req.user.id,
-      sessionId: req.params.sessionId
-    }).lean();
+router.get('/feed', optionalAuth, async (req, res) => {
+  const sessionId = req.query.sessionId;
+  const userId = req.user ? req.user.id : null;
 
-    if (!session) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy phiên trò chuyện'
-      });
+  try {
+    const filter = {};
+    if (userId) {
+      filter.$or = [{ userId }, ...(sessionId ? [{ sessionId }] : [])];
+    } else if (sessionId) {
+      filter.sessionId = sessionId;
+    } else {
+      return res.json({ success: true, data: { items: [], stats: { total: 0, safe: 0, warning: 0, danger: 0 } } });
     }
+
+    const docs = await ChatMessage.find(filter).sort({ createdAt: 1 }).limit(200);
+
+    // Ghép cặp câu hỏi người dùng và phản hồi AI tương ứng
+    const items = [];
+    for (let i = 0; i < docs.length; i++) {
+      if (docs[i].type === 'user') {
+        const userDoc = docs[i];
+        let aiDoc = null;
+        if (i + 1 < docs.length && docs[i + 1].type === 'ai') {
+          aiDoc = docs[i + 1];
+          i++; // Bỏ qua aiDoc ở vòng lặp ngoài
+        }
+
+        const textLower = userDoc.text.toLowerCase();
+        let category = 'general';
+        if (userDoc.files && userDoc.files.length > 0) category = 'file';
+        else if (textLower.includes('http://') || textLower.includes('https://') || textLower.includes('.vn') || textLower.includes('.com') || textLower.includes('.xyz') || textLower.includes('link') || textLower.includes('web')) category = 'url';
+        else if (textLower.includes('@') || textLower.includes('email') || textLower.includes('thư')) category = 'email';
+        else if (/\b(0|\+84)\d{8,10}\b/.test(textLower) || textLower.includes('sđt') || textLower.includes('điện thoại')) category = 'phone';
+
+        const status = aiDoc ? aiDoc.status : 'info';
+
+        items.push({
+          id: userDoc._id.toString(),
+          aiId: aiDoc ? aiDoc._id.toString() : null,
+          query: userDoc.text,
+          files: userDoc.files || [],
+          response: aiDoc ? aiDoc.text : 'Chưa có phản hồi.',
+          status,
+          category,
+          recommendations: aiDoc ? (aiDoc.recommendations || []) : [],
+          timestamp: userDoc.createdAt
+        });
+      } else if (docs[i].type === 'ai') {
+        items.push({
+          id: docs[i]._id.toString(),
+          aiId: docs[i]._id.toString(),
+          query: 'Tư vấn an ninh mạng',
+          files: [],
+          response: docs[i].text,
+          status: docs[i].status || 'info',
+          category: 'general',
+          recommendations: docs[i].recommendations || [],
+          timestamp: docs[i].createdAt
+        });
+      }
+    }
+
+    // Sắp xếp mục mới nhất lên đầu timeline
+    items.reverse();
+
+    const stats = {
+      total: items.length,
+      safe: items.filter(it => it.status === 'safe').length,
+      warning: items.filter(it => it.status === 'warning').length,
+      danger: items.filter(it => it.status === 'danger').length,
+    };
 
     res.json({
       success: true,
-      data: { session }
+      data: {
+        items,
+        stats
+      }
     });
-  } catch (error) {
-    console.error('Get chat session detail error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Không thể tải nội dung phiên trò chuyện'
-    });
+  } catch (err) {
+    console.error('Lỗi lấy feed nhật ký:', err);
+    res.status(500).json({ success: false, message: 'Lỗi tải nhật ký tư vấn' });
   }
 });
 
 /**
- * @route   PATCH /api/chat/sessions/:sessionId
- * @desc    Đổi tên tiêu đề của phiên chat
- * @access  Private (Premium Only)
- */
-router.patch('/sessions/:sessionId', authenticate, requirePremium, async (req, res) => {
-  try {
-    const { title } = req.body;
-    if (!title || !title.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Tiêu đề không được để trống'
-      });
-    }
-
-    const session = await ChatHistoryModel.findOneAndUpdate(
-      { userId: req.user.id, sessionId: req.params.sessionId },
-      { title: title.trim() },
-      { new: true }
-    );
-
-    if (!session) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy phiên trò chuyện'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: { session }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Không thể đổi tên phiên trò chuyện'
-    });
-  }
-});
-
-/**
- * @route   DELETE /api/chat/sessions/:sessionId
- * @desc    Xóa phiên chat đã lưu
- * @access  Private (Premium Only)
- */
-router.delete('/sessions/:sessionId', authenticate, requirePremium, async (req, res) => {
-  try {
-    const result = await ChatHistoryModel.findOneAndDelete({
-      userId: req.user.id,
-      sessionId: req.params.sessionId
-    });
-
-    // Đồng thời xóa khỏi memory nếu có
-    chatHistories.delete(req.params.sessionId);
-
-    if (!result) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy phiên trò chuyện để xóa'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Đã xóa phiên trò chuyện thành công'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi xóa phiên trò chuyện'
-    });
-  }
-});
-
-/**
- * @route   GET /api/chat/history/:sessionId
- * @desc    Lấy lịch sử chat tạm trong memory theo session (cho guest / free)
+ * @route   DELETE /api/chat/message/:id
+ * @desc    Xóa một mục cụ thể trong nhật ký
  * @access  Public
  */
-router.get('/history/:sessionId', (req, res) => {
-  const { sessionId } = req.params;
-  const history = chatHistories.get(sessionId) || [];
-
-  res.json({
-    success: true,
-    data: {
-      sessionId,
-      history,
-      messageCount: history.length
-    }
-  });
+router.delete('/message/:id', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await ChatMessage.deleteOne({ _id: id });
+    res.json({ success: true, message: 'Đã xóa mục nhật ký thành công' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi xóa mục nhật ký' });
+  }
 });
 
 /**
  * @route   DELETE /api/chat/history/:sessionId
- * @desc    Xóa lịch sử chat tạm trong memory
+ * @desc    Xóa toàn bộ lịch sử chat
  * @access  Public
  */
-router.delete('/history/:sessionId', (req, res) => {
+router.delete('/history/:sessionId', optionalAuth, async (req, res) => {
   const { sessionId } = req.params;
-  chatHistories.delete(sessionId);
+  const userId = req.user ? req.user.id : null;
+
+  try {
+    const filter = {
+      $or: [
+        { sessionId },
+        ...(userId ? [{ userId }] : [])
+      ]
+    };
+    await ChatMessage.deleteMany(filter);
+  } catch (err) {
+    console.warn('Lỗi xóa tin nhắn trong DB:', err.message);
+  }
+
+  memoryChatHistories.delete(sessionId);
 
   res.json({
     success: true,
-    message: 'Đã làm mới phiên chat'
+    message: 'Đã xóa lịch sử chat thành công'
   });
 });
 

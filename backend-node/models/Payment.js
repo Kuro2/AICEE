@@ -19,7 +19,6 @@ const paymentSchema = new mongoose.Schema({
   },
   planType: {
     type: String,
-    enum: ['premium_monthly', 'premium_yearly'],
     required: true
   },
   status: {
@@ -30,8 +29,8 @@ const paymentSchema = new mongoose.Schema({
   },
   provider: {
     type: String,
-    enum: ['vnpay', 'mock', 'momo'],
-    default: 'vnpay'
+    enum: ['sepay', 'vnpay', 'mock'],
+    default: 'sepay'
   },
   transactionId: {
     type: String,
@@ -39,6 +38,10 @@ const paymentSchema = new mongoose.Schema({
   },
   paymentUrl: {
     type: String,
+    default: null
+  },
+  paidAt: {
+    type: Date,
     default: null
   },
   metadata: {
@@ -51,4 +54,7 @@ const paymentSchema = new mongoose.Schema({
 
 const PaymentModel = mongoose.models.Payment || mongoose.model('Payment', paymentSchema);
 
-module.exports = { PaymentModel };
+module.exports = {
+  PaymentModel,
+  Payment: PaymentModel
+};

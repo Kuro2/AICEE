@@ -1,79 +1,64 @@
 import React from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { XCircle, RefreshCw, ArrowLeft, AlertCircle, HelpCircle } from 'lucide-react';
+import { XCircle, ArrowLeft, RefreshCw, HelpCircle } from 'lucide-react';
 
 const PaymentFailed = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const orderId = searchParams.get('orderId') || searchParams.get('vnp_TxnRef') || 'N/A';
-  const errorCode = searchParams.get('code') || searchParams.get('vnp_ResponseCode') || 'CANCELLED';
+  const orderId = searchParams.get('orderId');
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-blue-950 to-slate-950 text-white flex flex-col">
+    <div className="min-h-screen bg-[#050505] flex flex-col font-sans selection:bg-rose-500/30 relative overflow-hidden text-white">
+      {/* Glow effect */}
+      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[600px] h-[500px] bg-rose-600/15 rounded-full blur-[140px] pointer-events-none"></div>
+
       <Header />
 
-      <main className="flex-grow pt-32 pb-20 px-4 flex items-center justify-center">
-        <div className="max-w-lg w-full bg-slate-900/80 border border-red-500/40 rounded-3xl p-8 md:p-10 shadow-2xl shadow-red-500/10 text-center backdrop-blur-xl relative overflow-hidden">
-          {/* Background Glow */}
-          <div className="absolute -top-24 -left-24 w-48 h-48 bg-red-500/20 rounded-full blur-3xl pointer-events-none" />
-
-          {/* Icon */}
-          <div className="mx-auto w-20 h-20 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center mb-6 shadow-lg shadow-red-500/30">
-            <XCircle className="w-12 h-12 text-red-400" />
+      <main className="flex-grow pt-32 pb-24 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center relative z-10">
+        <div className="max-w-md w-full bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 sm:p-10 backdrop-blur-2xl shadow-2xl relative text-center">
+          
+          <div className="w-20 h-20 bg-rose-500/20 border border-rose-500/40 rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-[0_0_30px_rgba(244,63,94,0.3)]">
+            <XCircle className="w-12 h-12 text-rose-400" />
           </div>
 
-          <div className="inline-flex items-center space-x-1.5 px-3.5 py-1 rounded-full bg-red-500/10 text-red-300 text-xs font-semibold mb-3 border border-red-500/30">
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>Giao dịch không thành công</span>
-          </div>
-
-          <h1 className="text-3xl font-extrabold text-white mb-2">
-            Thanh Toán Bị Gián Đoạn
+          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-rose-100 to-rose-300 mb-3">
+            Giao dịch đã bị hủy
           </h1>
-          <p className="text-gray-300 text-sm max-w-md mx-auto mb-6">
-            Giao dịch nâng cấp gói chưa thể hoàn tất. Tài khoản của bạn vẫn chưa bị trừ tiền hoặc giao dịch đã bị hủy bởi người dùng.
+          
+          <p className="text-gray-300 text-sm mb-6 leading-relaxed">
+            Bạn đã hủy giao dịch hoặc quá trình thanh toán qua SePay chưa hoàn tất. Không có khoản tiền nào bị trừ khỏi tài khoản của bạn.
           </p>
 
-          {/* Details */}
-          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 mb-6 text-left space-y-2 text-sm">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Mã đơn hàng</span>
-              <span className="font-mono text-gray-200">{orderId}</span>
+          {orderId && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-3 mb-6 text-xs text-gray-400 font-mono">
+              Mã đơn hàng: {orderId}
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Mã phản hồi</span>
-              <span className="text-red-400 font-mono font-semibold">{errorCode}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Lý do</span>
-              <span className="text-gray-300">Khách hàng hủy giao dịch hoặc quá thời gian thanh toán</span>
-            </div>
-          </div>
+          )}
 
-          {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() => navigate('/pricing')}
-              className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 text-white font-bold transition-all shadow-lg shadow-red-500/25 flex items-center justify-center space-x-2"
+          <div className="flex flex-col gap-3">
+            <Link
+              to="/pricing"
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center justify-center gap-2"
             >
               <RefreshCw className="w-4 h-4" />
-              <span>Thử Thanh Toán Lại</span>
-            </button>
+              <span>Thử thanh toán lại</span>
+            </Link>
+            
             <Link
               to="/"
-              className="py-3.5 px-6 rounded-xl border border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-gray-300 hover:text-white font-medium transition-all text-sm flex items-center justify-center space-x-1.5"
+              className="w-full py-3.5 px-4 bg-white/10 hover:bg-white/15 border border-white/10 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Về Trang Chủ</span>
+              <span>Quay lại trang chủ</span>
             </Link>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-slate-800/80 text-xs text-gray-400 flex items-center justify-center space-x-1">
-            <HelpCircle className="w-4 h-4 text-cyan-400" />
-            <span>Cần trợ giúp? Liên hệ với chúng tôi qua hotline hoặc email hỗ trợ AICEE</span>
+          <div className="mt-8 pt-6 border-t border-white/10 flex items-center justify-center gap-2 text-xs text-gray-500">
+            <HelpCircle className="w-4 h-4" />
+            <span>Cần hỗ trợ? Liên hệ bộ phận kỹ thuật AICEE</span>
           </div>
+
         </div>
       </main>
 

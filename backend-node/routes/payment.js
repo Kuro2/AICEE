@@ -1,286 +1,328 @@
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');
-const { authenticate } = require('../middleware/auth');
-const { PaymentModel } = require('../models/Payment');
+const axios = require('axios');
+const Order = require('../models/Order');
 const { UserModel } = require('../models/User');
+const { authenticate, optionalAuth, isAdmin } = require('../middleware/auth');
 
-const PLANS = {
-  premium_monthly: {
-    name: 'AICEE Premium 1 Tháng',
-    amount: 49000,
-    durationDays: 30
-  },
-  premium_yearly: {
-    name: 'AICEE Premium 1 Năm',
-    amount: 399000,
-    durationDays: 365
-  }
+// Cấu hình SePay từ biến môi trường
+const SEPAY_CONFIG = {
+  apiToken: (process.env.SEPAY_API_TOKEN || 'HP7KCPUEXD7Z1RJMS5XSOK3WFY8NR301PAELLY0HGILH9OAGF6JZEUZITWXN82YG').trim(),
+  bankName: (process.env.SEPAY_BANK_NAME || 'TPBank').trim(),
+  bankCode: (process.env.SEPAY_BANK_CODE || 'TPB').trim(),
+  accountNumber: (process.env.SEPAY_ACCOUNT_NUMBER || '10005920328').trim(),
+  accountHolder: (process.env.SEPAY_ACCOUNT_HOLDER || 'TRAN TRUNG HAI').trim(),
+  apiUrl: 'https://my.sepay.vn/userapi'
+};
+
+// Bảng giá quy đổi
+const PLAN_PRICES = {
+  premium: { monthly: 49000, yearly: 490000 },
+  business: { monthly: 625000, yearly: 6996000 },
+  api: { monthly: 2000000, yearly: 20000000 },
+  'platform-api': { monthly: 2000000, yearly: 20000000 }
 };
 
 /**
- * Helper format date VNPay: yyyyMMddHHmmss
+ * Hàm kích hoạt gói cước cho User khi thanh toán thành công
  */
-function getVNPayDateFormat(date = new Date()) {
-  const pad = (n) => (n < 10 ? '0' + n : n);
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-  const seconds = pad(date.getSeconds());
-  return `${year}${month}${day}${hours}${minutes}${seconds}`;
-}
+async function fulfillOrder(order, transactionData = null) {
+  if (order.status === 'paid') return;
 
-/**
- * Helper sắp xếp params cho VNPay
- */
-function sortObject(obj) {
-  const sorted = {};
-  const str = [];
-  let key;
-  for (key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      str.push(encodeURIComponent(key));
+  order.status = 'paid';
+  order.paidAt = new Date();
+  if (transactionData) {
+    order.transactionId = transactionData.id ? String(transactionData.id) : order.transactionId;
+    order.sepayTransaction = transactionData;
+  }
+  await order.save();
+
+  // Nâng cấp gói cho người dùng
+  const user = await UserModel.findById(order.userId);
+  if (user) {
+    user.plan = order.plan === 'api' ? 'platform-api' : order.plan;
+    const expires = new Date();
+    if (order.billingCycle === 'yearly') {
+      expires.setFullYear(expires.getFullYear() + 1);
+    } else {
+      expires.setMonth(expires.getMonth() + 1);
     }
+    user.subscriptionExpires = expires;
+    await user.save();
+    console.log(`[SePay] Đã nâng cấp thành công gói ${user.plan} cho user: ${user.email} (${user._id})`);
   }
-  str.sort();
-  for (key = 0; key < str.length; key++) {
-    sorted[str[key]] = encodeURIComponent(obj[decodeURIComponent(str[key])]).replace(/%20/g, '+');
-  }
-  return sorted;
 }
 
 /**
- * @route   POST /api/payment/create
- * @desc    Tạo đơn thanh toán gói dịch vụ
- * @access  Private (Cần đăng nhập)
+ * @route   POST /api/payment/create-order
+ * @desc    Tạo đơn hàng nâng cấp gói cước qua SePay QR
+ * @access  Private
  */
-router.post('/create', authenticate, async (req, res) => {
+router.post('/create-order', authenticate, async (req, res) => {
   try {
-    const { planType, provider = 'vnpay' } = req.body;
-    const plan = PLANS[planType];
+    const { plan, billingCycle = 'monthly' } = req.body;
+    const planKey = (plan || '').toLowerCase();
 
-    if (!plan) {
+    if (!PLAN_PRICES[planKey]) {
       return res.status(400).json({
         success: false,
-        message: 'Gói dịch vụ không hợp lệ. Vui lòng chọn premium_monthly hoặc premium_yearly.'
+        message: `Gói cước "${plan}" không hợp lệ để thanh toán.`
       });
     }
 
-    const orderId = `AICEE_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const amount = PLAN_PRICES[planKey][billingCycle] || PLAN_PRICES[planKey].monthly;
+    
+    // Tạo mã đơn hàng duy nhất có tiền tố AICEE để nhận diện trong nội dung chuyển khoản
+    const randomCode = Math.floor(100000 + Math.random() * 900000);
+    const orderCode = `AICEE${randomCode}`;
 
-    const payment = await PaymentModel.create({
+    const newOrder = new Order({
       userId: req.user.id,
-      orderId,
-      amount: plan.amount,
-      planType,
-      provider,
+      orderCode,
+      plan: planKey,
+      amount,
+      billingCycle,
+      paymentGateway: `${SEPAY_CONFIG.bankName} (SePay)`,
+      accountNumber: SEPAY_CONFIG.accountNumber,
       status: 'pending'
     });
 
-    const tmnCode = process.env.VNPAY_TMN_CODE;
-    const secretKey = process.env.VNPAY_HASH_SECRET;
-    const vnpUrl = process.env.VNPAY_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const returnUrl = process.env.VNPAY_RETURN_URL || `${frontendUrl}/payment/success`;
+    await newOrder.save();
 
-    // Nếu cấu hình VNPay đầy đủ thì build URL VNPay
-    if (tmnCode && secretKey && provider === 'vnpay') {
-      const createDate = getVNPayDateFormat(new Date());
-      const ipAddr = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-
-      let vnp_Params = {
-        vnp_Version: '2.1.0',
-        vnp_Command: 'pay',
-        vnp_TmnCode: tmnCode,
-        vnp_Locale: 'vn',
-        vnp_CurrCode: 'VND',
-        vnp_TxnRef: orderId,
-        vnp_OrderInfo: `Thanh toan goi ${plan.name} tai AICEE`,
-        vnp_OrderType: 'other',
-        vnp_Amount: plan.amount * 100, // VNPay tính bằng đơn vị xu/đồng x100
-        vnp_ReturnUrl: returnUrl,
-        vnp_IpAddr: ipAddr.includes('::') ? '127.0.0.1' : ipAddr,
-        vnp_CreateDate: createDate
-      };
-
-      vnp_Params = sortObject(vnp_Params);
-      const querystring = require('querystring');
-      const signData = querystring.stringify(vnp_Params, { encode: false });
-      const hmac = crypto.createHmac('sha512', secretKey);
-      const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
-      vnp_Params['vnp_SecureHash'] = signed;
-      const paymentUrl = `${vnpUrl}?${querystring.stringify(vnp_Params, { encode: false })}`;
-
-      payment.paymentUrl = paymentUrl;
-      await payment.save();
-
-      return res.json({
-        success: true,
-        data: {
-          orderId,
-          amount: plan.amount,
-          planName: plan.name,
-          paymentUrl,
-          mode: 'vnpay'
-        }
-      });
-    }
-
-    // Nếu chưa cấu hình VNPay hoặc test mock mode
-    // Trả về URL dẫn đến màn hình thanh toán mô phỏng
-    const mockUrl = `${frontendUrl}/payment/checkout-simulator?orderId=${orderId}&amount=${plan.amount}&plan=${planType}`;
-    payment.paymentUrl = mockUrl;
-    await payment.save();
+    // Link mã QR trực tiếp từ dịch vụ SePay
+    const sepayQrUrl = `https://qr.sepay.vn/img?acc=${SEPAY_CONFIG.accountNumber}&bank=${SEPAY_CONFIG.bankName}&amount=${amount}&des=${orderCode}&template=compact`;
+    
+    // Link VietQR dự phòng
+    const vietQrUrl = `https://img.vietqr.io/image/${SEPAY_CONFIG.bankCode}-${SEPAY_CONFIG.accountNumber}-compact2.png?amount=${amount}&addInfo=${orderCode}&accountName=${encodeURIComponent(SEPAY_CONFIG.accountHolder)}`;
 
     res.json({
       success: true,
+      message: 'Tạo đơn hàng thanh toán SePay thành công',
       data: {
-        orderId,
-        amount: plan.amount,
-        planName: plan.name,
-        paymentUrl: mockUrl,
-        mode: 'simulator'
+        orderId: newOrder._id,
+        orderCode: newOrder.orderCode,
+        plan: newOrder.plan,
+        amount: newOrder.amount,
+        billingCycle: newOrder.billingCycle,
+        qrUrl: sepayQrUrl,
+        vietQrUrl,
+        bankInfo: {
+          bankName: SEPAY_CONFIG.bankName,
+          bankCode: SEPAY_CONFIG.bankCode,
+          accountNumber: SEPAY_CONFIG.accountNumber,
+          accountHolder: SEPAY_CONFIG.accountHolder,
+          amount,
+          orderCode
+        }
       }
     });
   } catch (error) {
-    console.error('Payment create error:', error);
+    console.error('[SePay Create Order Error]:', error);
     res.status(500).json({
       success: false,
-      message: 'Không thể khởi tạo giao dịch thanh toán. Vui lòng thử lại.'
+      message: error.message || 'Lỗi khi tạo đơn hàng thanh toán'
     });
   }
 });
 
 /**
- * @route   POST /api/payment/simulate
- * @desc    Xác nhận giao dịch thanh toán trong môi trường sandbox/demo
- * @access  Private
+ * @route   GET /api/payment/check-status/:orderCode
+ * @desc    Kiểm tra trạng thái đơn hàng (gọi SePay API tra cứu biến động số dư ngân hàng)
+ * @access  Public / OptionalAuth
  */
-router.post('/simulate', authenticate, async (req, res) => {
+router.get('/check-status/:orderCode', optionalAuth, async (req, res) => {
   try {
-    const { orderId, status = 'success' } = req.body;
+    const { orderCode } = req.params;
+    const cleanCode = (orderCode || '').trim().toUpperCase();
 
-    const payment = await PaymentModel.findOne({ orderId, userId: req.user.id });
-    if (!payment) {
+    const order = await Order.findOne({ orderCode: cleanCode });
+    if (!order) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy giao dịch này'
+        message: 'Không tìm thấy đơn hàng với mã: ' + cleanCode
       });
     }
 
-    if (payment.status === 'success') {
+    // Nếu đơn hàng đã được đánh dấu thanh toán trước đó
+    if (order.status === 'paid') {
+      const user = await UserModel.findById(order.userId);
       return res.json({
         success: true,
-        message: 'Giao dịch đã được ghi nhận thành công trước đó',
-        data: { payment }
-      });
-    }
-
-    if (status === 'success') {
-      payment.status = 'success';
-      payment.transactionId = `SIM_${Date.now()}`;
-      await payment.save();
-
-      const planConfig = PLANS[payment.planType] || PLANS.premium_monthly;
-      const durationDays = planConfig.durationDays || 30;
-
-      // Tính ngày hết hạn
-      const now = new Date();
-      const user = await UserModel.findById(req.user.id);
-      let expiryDate = new Date();
-
-      if (user.plan === 'premium' && user.planExpiry && new Date(user.planExpiry) > now) {
-        // Cộng dồn thời gian nếu đang còn hạn
-        expiryDate = new Date(user.planExpiry);
-      }
-      expiryDate.setDate(expiryDate.getDate() + durationDays);
-
-      user.plan = 'premium';
-      user.planExpiry = expiryDate;
-      await user.save();
-
-      return res.json({
-        success: true,
-        message: 'Nâng cấp Premium thành công!',
+        isPaid: true,
         data: {
-          orderId: payment.orderId,
-          plan: user.plan,
-          planExpiry: user.planExpiry,
-          amount: payment.amount
+          orderCode: order.orderCode,
+          plan: order.plan,
+          paidAt: order.paidAt,
+          userPlan: user?.plan || order.plan,
+          subscriptionExpires: user?.subscriptionExpires
         }
       });
-    } else {
-      payment.status = 'failed';
-      await payment.save();
-
-      return res.json({
-        success: false,
-        message: 'Giao dịch thanh toán thất bại'
-      });
     }
+
+    // Nếu chưa đánh dấu thanh toán, gọi trực tiếp SePay API để kiểm tra danh sách giao dịch mới nhất
+    try {
+      const sepayRes = await axios.get(`${SEPAY_CONFIG.apiUrl}/transactions/list`, {
+        headers: {
+          Authorization: `Bearer ${SEPAY_CONFIG.apiToken}`
+        },
+        timeout: 8000
+      });
+
+      const transactions = sepayRes.data?.transactions || [];
+      console.log(`[SePay Check] Đang tra cứu SePay cho mã ${cleanCode}. Tổng số giao dịch trả về: ${transactions.length}`);
+
+      // Tìm giao dịch khớp với mã đơn hàng và số tiền (hỗ trợ cả format SePay API và Webhook)
+      const matchedTx = transactions.find(tx => {
+        const content = `${tx.transaction_content || ''} ${tx.content || ''} ${tx.description || ''} ${tx.code || ''}`.toUpperCase();
+        const amountIn = Number(tx.amount_in || tx.transferAmount || tx.amount || 0);
+        const isInbound = tx.transferType === 'in' || amountIn > 0;
+        const isCodeMatched = content.includes(cleanCode);
+        const isAmountMatched = amountIn >= Number(order.amount);
+
+        return isInbound && isCodeMatched && isAmountMatched;
+      });
+
+      if (matchedTx) {
+        const matchedAmount = matchedTx.amount_in || matchedTx.transferAmount || matchedTx.amount;
+        console.log(`[SePay Match!] Tìm thấy giao dịch SePay khớp: #${matchedTx.id} - ${matchedAmount}đ cho mã ${cleanCode}`);
+        await fulfillOrder(order, matchedTx);
+
+        const user = await UserModel.findById(order.userId);
+        return res.json({
+          success: true,
+          isPaid: true,
+          message: 'Thanh toán thành công! Gói cước đã được kích hoạt tự động.',
+          data: {
+            orderCode: order.orderCode,
+            plan: order.plan,
+            paidAt: order.paidAt,
+            userPlan: user?.plan || order.plan,
+            subscriptionExpires: user?.subscriptionExpires
+          }
+        });
+      }
+    } catch (apiErr) {
+      console.warn('[SePay API Polling Warning]:', apiErr.response?.data || apiErr.message);
+    }
+
+    // Chưa phát hiện giao dịch khớp
+    return res.json({
+      success: true,
+      isPaid: false,
+      message: 'Đang lắng nghe chuyển khoản ngân hàng...'
+    });
   } catch (error) {
-    console.error('Payment simulate error:', error);
+    console.error('[SePay Check Status Error]:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi xử lý trạng thái thanh toán'
+      message: 'Lỗi server khi kiểm tra trạng thái thanh toán'
     });
   }
 });
 
 /**
- * @route   GET /api/payment/order/:orderId
- * @desc    Lấy chi tiết đơn thanh toán
- * @access  Private
+ * @route   POST /api/payment/sepay-webhook
+ * @desc    Webhook nhận thông báo biến động số dư tự động từ SePay
+ * @access  Public (SePay Webhook IP/Server)
  */
-router.get('/order/:orderId', authenticate, async (req, res) => {
+router.post('/sepay-webhook', async (req, res) => {
   try {
-    const payment = await PaymentModel.findOne({
-      orderId: req.params.orderId,
-      userId: req.user.id
-    });
+    const data = req.body;
+    console.log('[SePay Webhook Received]:', JSON.stringify(data));
 
-    if (!payment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy đơn hàng'
-      });
+    if (!data) {
+      return res.status(400).json({ success: false, message: 'Dữ liệu webhook trống' });
     }
 
-    res.json({
+    const content = `${data.transaction_content || ''} ${data.content || ''} ${data.description || ''} ${data.code || ''}`.toUpperCase();
+    const transferAmount = Number(data.amount_in || data.transferAmount || data.amount || 0);
+
+    // Trích xuất mã đơn hàng có định dạng AICEE + 6 số
+    const match = content.match(/AICEE\d+/i);
+    if (!match) {
+      console.log('[SePay Webhook] Không tìm thấy mã đơn hàng AICEE trong nội dung chuyển khoản:', content);
+      return res.json({ success: true, message: 'Bỏ qua giao dịch không chứa mã đơn hàng AICEE' });
+    }
+
+    const orderCode = match[0].toUpperCase();
+    const order = await Order.findOne({ orderCode });
+
+    if (!order) {
+      console.log(`[SePay Webhook] Không tìm thấy đơn hàng với mã ${orderCode}`);
+      return res.json({ success: true, message: 'Không tìm thấy đơn hàng tương ứng' });
+    }
+
+    if (transferAmount < order.amount) {
+      console.warn(`[SePay Webhook] Số tiền chuyển ${transferAmount} nhỏ hơn giá gói ${order.amount} cho mã ${orderCode}`);
+      return res.json({ success: true, message: 'Số tiền chuyển không đủ' });
+    }
+
+    await fulfillOrder(order, data);
+
+    return res.json({
       success: true,
-      data: { payment }
+      message: 'Xử lý webhook SePay và kích hoạt gói cước thành công!'
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi truy xuất đơn hàng'
-    });
+    console.error('[SePay Webhook Error]:', error);
+    res.status(500).json({ success: false, message: 'Lỗi xử lý webhook' });
   }
 });
 
 /**
- * @route   GET /api/payment/history
- * @desc    Lấy lịch sử thanh toán của tài khoản
+ * @route   POST /api/payment/simulate/:orderCode
+ * @desc    Giả lập thanh toán thành công (hỗ trợ kiểm thử / demo nhanh khi dev)
  * @access  Private
  */
-router.get('/history', authenticate, async (req, res) => {
+router.post('/simulate/:orderCode', authenticate, async (req, res) => {
   try {
-    const payments = await PaymentModel.find({ userId: req.user.id })
-      .sort({ createdAt: -1 })
-      .limit(20);
+    const { orderCode } = req.params;
+    const order = await Order.findOne({ orderCode: orderCode.toUpperCase() });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
+    }
+
+    await fulfillOrder(order, {
+      id: `SIM_${Date.now()}`,
+      gateway: 'SePay Demo Simulation',
+      transferAmount: order.amount,
+      content: `${order.orderCode} DEMO PAYMENT`
+    });
+
+    const user = await UserModel.findById(order.userId);
 
     res.json({
       success: true,
-      data: { payments }
+      message: `[Mô phỏng] Đã kích hoạt thành công gói ${order.plan.toUpperCase()}!`,
+      data: {
+        orderCode: order.orderCode,
+        plan: order.plan,
+        paidAt: order.paidAt,
+        userPlan: user?.plan,
+        subscriptionExpires: user?.subscriptionExpires
+      }
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy lịch sử thanh toán'
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
+});
+
+/**
+ * @route   GET /api/payment/bank-info
+ * @desc    Lấy thông tin tài khoản ngân hàng SePay đã kết nối
+ * @access  Public
+ */
+router.get('/bank-info', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      bankName: SEPAY_CONFIG.bankName,
+      bankCode: SEPAY_CONFIG.bankCode,
+      accountNumber: SEPAY_CONFIG.accountNumber,
+      accountHolder: SEPAY_CONFIG.accountHolder
+    }
+  });
 });
 
 module.exports = router;

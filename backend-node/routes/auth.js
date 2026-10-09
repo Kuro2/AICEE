@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { findUserByEmail, createUser, verifyLogin, findOrCreateSocialUser } = require('../models/User');
+const bcrypt = require('bcryptjs');
+const { findUserByEmail, createUser, verifyLogin, findOrCreateSocialUser, updateUser, UserModel } = require('../models/User');
 const { generateToken, authenticate } = require('../middleware/auth');
 const { OAuth2Client } = require('google-auth-library');
 const axios = require('axios');
@@ -125,6 +126,78 @@ router.get('/me', authenticate, (req, res) => {
 });
 
 /**
+ * @route   PUT /api/auth/profile
+ * @desc    Cập nhật thông tin profile của user (name, avatar)
+ * @access  Private
+ */
+router.put('/profile', authenticate, async (req, res) => {
+  try {
+    const { name, avatar } = req.body;
+    const updates = {};
+    if (name !== undefined) updates.name = name.trim();
+    if (avatar !== undefined) updates.avatar = avatar;
+
+    const updatedUser = await updateUser(req.user.id, updates);
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản người dùng' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Cập nhật thông tin thành công!',
+      data: { user: updatedUser }
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server khi cập nhật thông tin hồ sơ' });
+  }
+});
+
+/**
+ * @route   PUT /api/auth/change-password
+ * @desc    Đổi mật khẩu người dùng
+ * @access  Private
+ */
+router.put('/change-password', authenticate, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
+    }
+
+    const user = await UserModel.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản người dùng' });
+    }
+
+    // Nếu user đã có mật khẩu, bắt buộc kiểm tra currentPassword
+    if (user.password) {
+      if (!currentPassword) {
+        return res.status(400).json({ success: false, message: 'Vui lòng nhập mật khẩu hiện tại' });
+      }
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: 'Mật khẩu hiện tại không chính xác' });
+      }
+    }
+
+    const hadPasswordBefore = !!user.password;
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({
+      success: true,
+      message: hadPasswordBefore ? 'Đổi mật khẩu thành công!' : 'Thiết lập mật khẩu thành công! Giờ đây bạn có thể dùng mật khẩu này để đăng nhập trực tiếp.',
+      hasPassword: true
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi khi đổi mật khẩu' });
+  }
+});
+
+/**
  * @route   POST /api/auth/logout
  * @desc    Đăng xuất (client-side token removal)
  * @access  Private
@@ -153,7 +226,7 @@ router.post('/google', async (req, res) => {
       headers: { Authorization: `Bearer ${token}` }
     });
     const payload = response.data;
-    
+
     // Tìm hoặc tạo user
     const profile = {
       email: payload.email,
@@ -200,7 +273,7 @@ router.post('/facebook', async (req, res) => {
     // Lấy thông tin user từ Graph API
     const response = await axios.get(`https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`);
     const payload = response.data;
-    
+
     // Tạo email giả nếu user đăng ký FB bằng số điện thoại
     const email = payload.email || `${payload.id}@facebook.aicee.com`;
 
