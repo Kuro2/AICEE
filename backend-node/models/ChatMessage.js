@@ -36,6 +36,12 @@ const chatMessageSchema = new mongoose.Schema({
     type: String 
   }],
   files: [fileAttachmentSchema],
+  newDataCheck: {
+    isNewData: { type: Boolean, default: false },
+    target: { type: String, default: '' },
+    type: { type: String, default: '' },
+    suggestRequest: { type: Boolean, default: false }
+  },
   createdAt: { 
     type: Date, 
     default: Date.now, 

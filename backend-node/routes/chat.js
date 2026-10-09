@@ -4,9 +4,110 @@ const { sendToGemini, analyzeFile } = require('../services/aiService');
 const { optionalAuth } = require('../middleware/auth');
 const { checkScanLimit } = require('../middleware/subscription');
 const ChatMessage = require('../models/ChatMessage');
+const Resource = require('../models/Resource');
+const Report = require('../models/Report');
 
 // Cache in-memory theo session để dự phòng
 const memoryChatHistories = new Map();
+
+/**
+ * Trích xuất mục tiêu (SĐT, Email, Website) từ văn bản người dùng
+ */
+function extractTargetFromText(text) {
+  if (!text || typeof text !== 'string') return null;
+
+  // 1. Kiểm tra Email
+  const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch) {
+    return {
+      target: emailMatch[0].trim(),
+      type: 'Email'
+    };
+  }
+
+  // 2. Kiểm tra Số điện thoại Việt Nam (+84 hoặc 0...)
+  const phoneMatch = text.match(/(?:\+84|0)[35789]\d{8}\b/);
+  if (phoneMatch) {
+    return {
+      target: phoneMatch[0].trim(),
+      type: 'SĐT'
+    };
+  }
+
+  // 3. Kiểm tra Website / URL
+  const urlMatch = text.match(/(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}(?:\/[^\s]*)?/i);
+  if (urlMatch) {
+    return {
+      target: urlMatch[0].trim(),
+      type: 'Website'
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Tra cứu trong cơ sở dữ liệu AICEE (Resource & Report) để biết là dữ liệu đã có hay là DỮ LIỆU MỚI
+ */
+async function checkDatabaseForTarget(extracted) {
+  if (!extracted) return null;
+  const { target, type } = extracted;
+
+  try {
+    const escapedTarget = target.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+    const targetRegex = new RegExp(escapedTarget, 'i');
+
+    // 1. Kiểm tra trong Resource (Whitelist / Blacklist)
+    const existingResource = await Resource.findOne({
+      $or: [
+        { address: targetRegex },
+        { address: target }
+      ]
+    });
+
+    if (existingResource) {
+      return {
+        found: true,
+        isNewData: false,
+        inResource: true,
+        isSafe: existingResource.isSafe,
+        resource: existingResource,
+        type,
+        target
+      };
+    }
+
+    // 2. Kiểm tra trong danh sách Báo cáo (Report)
+    const existingReport = await Report.findOne({
+      $or: [
+        { target: targetRegex },
+        { target: target }
+      ]
+    }).sort({ createdAt: -1 });
+
+    if (existingReport) {
+      return {
+        found: true,
+        isNewData: false,
+        inReport: true,
+        reportStatus: existingReport.status,
+        type,
+        target
+      };
+    }
+
+    // 3. Hoàn toàn chưa có trong hệ thống => ĐÂY LÀ DỮ LIỆU MỚI!
+    return {
+      found: false,
+      isNewData: true,
+      type,
+      target
+    };
+  } catch (err) {
+    console.warn('Lỗi tra cứu database cho target:', err.message);
+    return null;
+  }
+}
 
 /**
  * @route   POST /api/chat
@@ -50,6 +151,28 @@ router.post('/', optionalAuth, checkScanLimit, async (req, res) => {
       contextHistory = memoryChatHistories.get(sid) || [];
     }
 
+    // Phân tích xem có chứa SĐT, Email hay Website để đối chiếu hệ thống
+    let dbCheck = null;
+    let augmentedMessage = message || '';
+
+    if (message) {
+      const extracted = extractTargetFromText(message);
+      if (extracted) {
+        dbCheck = await checkDatabaseForTarget(extracted);
+        if (dbCheck) {
+          if (dbCheck.isNewData) {
+            augmentedMessage = `${message}\n\n[HỆ THỐNG AICEE THÔNG BÁO]: Dữ liệu ${dbCheck.type} "${dbCheck.target}" là DỮ LIỆU MỚI, CHƯA CÓ trong cơ sở dữ liệu AICEE.
+- Nếu người dùng chỉ tra cứu thông thường và nội dung KHÔNG chứa hành vi lừa đảo (không đòi OTP, không mạo danh cơ quan, không đòi nộp tiền): Hãy phân loại [THÔNG TIN] (ℹ️ THÔNG TIN), giải thích cú pháp hợp lệ và hiện chưa có lịch sử xấu trong hệ thống.
+- NẾU người dùng mô tả hành vi lừa đảo, tống tiền, giả mạo công an, đòi OTP: Hãy phân loại [CẢNH BÁO] hoặc [NGUY HIỂM] và gợi ý gửi yêu cầu xem xét để Admin thẩm định.`;
+          } else if (dbCheck.inResource) {
+            augmentedMessage = `${message}\n\n[HỆ THỐNG AICEE THÔNG BÁO]: Dữ liệu ${dbCheck.type} "${dbCheck.target}" ĐÃ CÓ trong hệ thống AICEE (${dbCheck.isSafe ? 'DANH SÁCH AN TOÀN / Whitelist' : 'DANH SÁCH ĐEN / Blacklist'}). Mô tả: ${dbCheck.resource.description || 'Đã xác minh'}.`;
+          } else if (dbCheck.inReport) {
+            augmentedMessage = `${message}\n\n[HỆ THỐNG AICEE THÔNG BÁO]: Dữ liệu ${dbCheck.type} "${dbCheck.target}" HIỆN ĐANG CÓ YÊU CẦU BÁO CÁO trên hệ thống (Trạng thái: ${dbCheck.reportStatus === 'pending' ? 'Chờ duyệt' : dbCheck.reportStatus}).`;
+          }
+        }
+      }
+    }
+
     // Xử lý phản hồi AI
     let aiResponse;
     if (files && files.length > 0) {
@@ -63,11 +186,26 @@ router.post('/', optionalAuth, checkScanLimit, async (req, res) => {
         recommendations: [...new Set(fileResults.flatMap(r => r.recommendations || []))]
       };
     } else {
-      aiResponse = await sendToGemini(message, contextHistory);
+      aiResponse = await sendToGemini(augmentedMessage, contextHistory);
+    }
+
+    // Điều chỉnh trạng thái nếu đã có trong Blacklist / Whitelist
+    if (dbCheck && dbCheck.inResource) {
+      aiResponse.status = dbCheck.isSafe ? 'safe' : 'danger';
     }
 
     const userText = message || (files?.length ? `Đã gửi ${files.length} tệp để phân tích` : '');
     const aiText = aiResponse.text;
+
+    // Chỉ kích hoạt gợi ý gửi request nếu dữ liệu mới VÀ có dấu hiệu cảnh báo/nguy hiểm
+    const shouldSuggest = dbCheck?.isNewData && (aiResponse.status === 'danger' || aiResponse.status === 'warning');
+
+    const newDataCheck = shouldSuggest ? {
+      isNewData: true,
+      target: dbCheck.target,
+      type: dbCheck.type,
+      suggestRequest: true
+    } : null;
 
     // Lưu vào MongoDB
     let savedAiId = Date.now();
@@ -86,7 +224,8 @@ router.post('/', optionalAuth, checkScanLimit, async (req, res) => {
         type: 'ai',
         text: aiText,
         status: aiResponse.status || 'info',
-        recommendations: aiResponse.recommendations || []
+        recommendations: aiResponse.recommendations || [],
+        newDataCheck: newDataCheck || undefined
       });
       savedAiId = aiMsgDoc._id;
     } catch (saveErr) {
@@ -107,6 +246,7 @@ router.post('/', optionalAuth, checkScanLimit, async (req, res) => {
         message: aiText,
         status: aiResponse.status || 'info',
         recommendations: aiResponse.recommendations || [],
+        newDataCheck,
         sessionId: sid,
         timestamp: new Date().toISOString()
       }
@@ -152,6 +292,7 @@ router.get('/history/:sessionId', optionalAuth, async (req, res) => {
       status: d.status,
       recommendations: d.recommendations || [],
       files: d.files || [],
+      newDataCheck: d.newDataCheck || null,
       timestamp: d.createdAt
     }));
 

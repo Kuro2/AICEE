@@ -4,6 +4,57 @@ const { analyzeUrl, analyzeEmail, analyzePhone, formatScanResponse } = require('
 const { sendToGemini } = require('../services/aiService');
 const { optionalAuth } = require('../middleware/auth');
 const { checkScanLimit } = require('../middleware/subscription');
+const Resource = require('../models/Resource');
+const Report = require('../models/Report');
+
+/**
+ * Tra cứu trong cơ sở dữ liệu (Resource & Report)
+ */
+async function checkDatabaseTarget(target, type) {
+  if (!target) return null;
+  try {
+    const escaped = target.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+
+    const resource = await Resource.findOne({
+      $or: [{ address: regex }, { address: target }]
+    });
+    if (resource) {
+      return {
+        found: true,
+        isNewData: false,
+        inResource: true,
+        isSafe: resource.isSafe,
+        resource,
+        type,
+        target
+      };
+    }
+
+    const report = await Report.findOne({
+      $or: [{ target: regex }, { target }]
+    }).sort({ createdAt: -1 });
+    if (report) {
+      return {
+        found: true,
+        isNewData: false,
+        inReport: true,
+        reportStatus: report.status,
+        type,
+        target
+      };
+    }
+
+    return {
+      found: false,
+      isNewData: true,
+      type,
+      target
+    };
+  } catch (e) {
+    return null;
+  }
+}
 
 /**
  * @route   POST /api/scan/url
@@ -21,8 +72,29 @@ router.post('/url', optionalAuth, checkScanLimit, async (req, res) => {
       });
     }
 
+    const dbCheck = await checkDatabaseTarget(url, 'Website');
+
     // Phân tích heuristic
     const scanResult = analyzeUrl(url);
+
+    if (dbCheck) {
+      if (dbCheck.inResource) {
+        if (!dbCheck.isSafe) {
+          scanResult.status = 'danger';
+          scanResult.score = 0;
+          scanResult.issues.unshift(`[Cơ sở dữ liệu AICEE]: Website này ĐÃ CÓ trong Danh sách Đen (Blacklist). Lý do: ${dbCheck.resource.description || 'Lừa đảo'}`);
+        } else {
+          scanResult.status = 'safe';
+          scanResult.score = 100;
+          scanResult.issues.unshift(`[Cơ sở dữ liệu AICEE]: Website này thuộc Danh sách An toàn đã xác minh.`);
+        }
+      } else if (dbCheck.inReport) {
+        scanResult.issues.unshift(`[Cơ sở dữ liệu AICEE]: Đang có báo cáo chờ Quản trị viên duyệt (Trạng thái: ${dbCheck.reportStatus}).`);
+      } else if (dbCheck.isNewData) {
+        scanResult.issues.push(`[Dữ liệu mới]: Website này chưa có trong cơ sở dữ liệu AICEE.`);
+      }
+    }
+
     const formatted = formatScanResponse('url', scanResult);
 
     // Tạo text phản hồi chi tiết
@@ -74,7 +146,27 @@ router.post('/email', optionalAuth, checkScanLimit, async (req, res) => {
       });
     }
 
+    const dbCheck = await checkDatabaseTarget(email, 'Email');
     const scanResult = analyzeEmail(email, subject || '', body || '');
+
+    if (dbCheck) {
+      if (dbCheck.inResource) {
+        if (!dbCheck.isSafe) {
+          scanResult.status = 'danger';
+          scanResult.score = 0;
+          scanResult.issues.unshift(`[Cơ sở dữ liệu AICEE]: Email này ĐÃ CÓ trong Danh sách Đen (Blacklist).`);
+        } else {
+          scanResult.status = 'safe';
+          scanResult.score = 100;
+          scanResult.issues.unshift(`[Cơ sở dữ liệu AICEE]: Email này thuộc Danh sách An toàn đã xác minh.`);
+        }
+      } else if (dbCheck.inReport) {
+        scanResult.issues.unshift(`[Cơ sở dữ liệu AICEE]: Đang có báo cáo chờ Quản trị viên duyệt (Trạng thái: ${dbCheck.reportStatus}).`);
+      } else if (dbCheck.isNewData) {
+        scanResult.issues.push(`[Dữ liệu mới]: Email này chưa có trong cơ sở dữ liệu AICEE.`);
+      }
+    }
+
     const formatted = formatScanResponse('email', scanResult);
 
     let responseText = `[PHÂN TÍCH EMAIL] ${email}\n\n`;
@@ -90,6 +182,7 @@ router.post('/email', optionalAuth, checkScanLimit, async (req, res) => {
         issues: scanResult.issues,
         details: scanResult.details,
         recommendations: formatted.recommendations,
+        newDataCheck: dbCheck?.isNewData ? { isNewData: true, target: email, type: 'Email', suggestRequest: true } : null,
         timestamp: new Date().toISOString()
       }
     });
@@ -118,7 +211,27 @@ router.post('/phone', optionalAuth, checkScanLimit, async (req, res) => {
       });
     }
 
+    const dbCheck = await checkDatabaseTarget(phone, 'SĐT');
     const scanResult = analyzePhone(phone);
+
+    if (dbCheck) {
+      if (dbCheck.inResource) {
+        if (!dbCheck.isSafe) {
+          scanResult.status = 'danger';
+          scanResult.score = 0;
+          scanResult.issues.unshift(`[Cơ sở dữ liệu AICEE]: Số điện thoại này ĐÃ CÓ trong Danh sách Đen (Blacklist).`);
+        } else {
+          scanResult.status = 'safe';
+          scanResult.score = 100;
+          scanResult.issues.unshift(`[Cơ sở dữ liệu AICEE]: Số điện thoại này thuộc Danh sách An toàn đã xác minh.`);
+        }
+      } else if (dbCheck.inReport) {
+        scanResult.issues.unshift(`[Cơ sở dữ liệu AICEE]: Đang có báo cáo chờ Quản trị viên duyệt (Trạng thái: ${dbCheck.reportStatus}).`);
+      } else if (dbCheck.isNewData) {
+        scanResult.issues.push(`[Dữ liệu mới]: Số điện thoại này chưa có trong cơ sở dữ liệu AICEE.`);
+      }
+    }
+
     const formatted = formatScanResponse('phone', scanResult);
 
     let responseText = `[XÁC MINH SỐ ĐIỆN THOẠI] ${phone}\n\n`;
@@ -134,6 +247,7 @@ router.post('/phone', optionalAuth, checkScanLimit, async (req, res) => {
         issues: scanResult.issues,
         details: scanResult.details,
         recommendations: formatted.recommendations,
+        newDataCheck: dbCheck?.isNewData ? { isNewData: true, target: phone, type: 'SĐT', suggestRequest: true } : null,
         timestamp: new Date().toISOString()
       }
     });
@@ -196,6 +310,27 @@ router.post('/quick', optionalAuth, checkScanLimit, async (req, res) => {
       });
     }
 
+    let targetType = type === 'url' ? 'Website' : type === 'email' ? 'Email' : 'SĐT';
+    const dbCheck = await checkDatabaseTarget(trimmed, targetType);
+
+    if (dbCheck) {
+      if (dbCheck.inResource) {
+        if (!dbCheck.isSafe) {
+          scanResult.status = 'danger';
+          scanResult.score = 0;
+          scanResult.issues.unshift(`[Cơ sở dữ liệu AICEE]: ${targetType} này ĐÃ CÓ trong Danh sách Đen (Blacklist).`);
+        } else {
+          scanResult.status = 'safe';
+          scanResult.score = 100;
+          scanResult.issues.unshift(`[Cơ sở dữ liệu AICEE]: ${targetType} này thuộc Danh sách An toàn đã xác minh.`);
+        }
+      } else if (dbCheck.inReport) {
+        scanResult.issues.unshift(`[Cơ sở dữ liệu AICEE]: Đang có báo cáo chờ Quản trị viên duyệt (Trạng thái: ${dbCheck.reportStatus}).`);
+      } else if (dbCheck.isNewData) {
+        scanResult.issues.push(`[Dữ liệu mới]: ${targetType} này chưa có trong cơ sở dữ liệu AICEE.`);
+      }
+    }
+
     const formatted = formatScanResponse(type, scanResult);
 
     res.json({
@@ -208,6 +343,7 @@ router.post('/quick', optionalAuth, checkScanLimit, async (req, res) => {
         message: formatted.text,
         issues: scanResult.issues,
         recommendations: formatted.recommendations,
+        newDataCheck: dbCheck?.isNewData ? { isNewData: true, target: trimmed, type: targetType, suggestRequest: true } : null,
         timestamp: new Date().toISOString()
       }
     });

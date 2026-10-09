@@ -197,38 +197,6 @@ export const chatAPI = {
     request('PATCH', `/chat/sessions/${sessionId}`, { title }),
 };
 
-// ── Payment API ───────────────────────────────────────────
-
-export const paymentAPI = {
-  /**
-   * Khởi tạo giao dịch thanh toán gói
-   * @param {string} planType - 'premium_monthly' hoặc 'premium_yearly'
-   * @param {string} provider - 'vnpay' hoặc 'mock'
-   */
-  create: (planType, provider = 'vnpay') =>
-    request('POST', '/payment/create', { planType, provider }),
-
-  /**
-   * Giả lập thanh toán cho môi trường thử nghiệm / demo
-   * @param {string} orderId
-   * @param {string} status - 'success' hoặc 'failed'
-   */
-  simulate: (orderId, status = 'success') =>
-    request('POST', '/payment/simulate', { orderId, status }),
-
-  /**
-   * Lấy chi tiết đơn thanh toán
-   */
-  getOrderDetail: (orderId) =>
-    request('GET', `/payment/order/${orderId}`),
-
-  /**
-   * Lấy lịch sử nạp gói
-   */
-  getHistory: () =>
-    request('GET', '/payment/history'),
-};
-
 // ── Scan API ──────────────────────────────────────────────
 
 export const scanAPI = {
@@ -406,6 +374,11 @@ export const reportAPI = {
     }
     return data;
   },
+
+  /**
+   * Gửi yêu cầu xem xét / báo cáo nhanh qua JSON (không đính kèm file)
+   */
+  createQuick: (data) => request('POST', '/reports', data),
 
   /**
    * Lấy danh sách báo cáo (Admin)

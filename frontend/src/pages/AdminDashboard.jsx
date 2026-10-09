@@ -13,7 +13,8 @@ import {
   TrendingUp,
   DollarSign,
   PieChart as PieIcon,
-  Calendar
+  Calendar,
+  AlertTriangle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {

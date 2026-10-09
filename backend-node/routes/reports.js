@@ -49,12 +49,20 @@ const upload = multer({
   }
 });
 
+const handleReportUpload = (req, res, next) => {
+  if (req.is('multipart/form-data')) {
+    upload.array('evidenceFiles', 5)(req, res, next);
+  } else {
+    next();
+  }
+};
+
 /**
  * @route   POST /api/reports
- * @desc    Gửi báo cáo lừa đảo mới (kèm file bằng chứng PNG/PDF)
+ * @desc    Gửi báo cáo lừa đảo mới (kèm file bằng chứng PNG/PDF hoặc gửi nhanh qua JSON)
  * @access  Public / OptionalAuth
  */
-router.post('/', optionalAuth, upload.array('evidenceFiles', 5), async (req, res) => {
+router.post('/', optionalAuth, handleReportUpload, async (req, res) => {
   try {
     const { target, type, title, description, reporterName, reporterEmail, reporterPhone } = req.body;
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { 
@@ -53,6 +53,8 @@ const ReportScam = () => {
   const [submittedData, setSubmittedData] = useState(null);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
+  const location = useLocation();
+
   useEffect(() => {
     const user = authAPI.getCurrentUser();
     if (user) {
@@ -60,7 +62,23 @@ const ReportScam = () => {
       setReporterName(user.name || '');
       setReporterEmail(user.email || '');
     }
-  }, []);
+
+    // Nhận dữ liệu truyền từ Chatbox khi phát hiện dữ liệu mới cần xem xét
+    if (location.state) {
+      if (location.state.target) setTarget(location.state.target);
+      if (location.state.type) setTargetType(location.state.type);
+      if (location.state.title) {
+        setTitle(location.state.title);
+      } else if (location.state.target) {
+        setTitle(`Yêu cầu xem xét: ${location.state.target}`);
+      }
+      if (location.state.description) {
+        setDescription(location.state.description);
+      } else if (location.state.target) {
+        setDescription(`Phát hiện qua trợ lý AI AICEE: Yêu cầu thẩm định dữ liệu mới (${location.state.type || 'mục tiêu'}) "${location.state.target}" để đưa vào hệ thống cảnh báo.`);
+      }
+    }
+  }, [location.state]);
 
   // Xử lý chọn tệp đính kèm
   const handleFileChange = (e) => {

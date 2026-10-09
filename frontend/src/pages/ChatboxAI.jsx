@@ -3,8 +3,9 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Shield, Send, User, Bot, Home, Menu, X, Sparkles,
   AlertCircle, CheckCircle, Info, Paperclip, File, Trash2,
+  HelpCircle, ExternalLink, ShieldAlert, Check, Loader
 } from 'lucide-react';
-import { chatAPI, uploadAPI, authAPI } from '@/services/api';
+import { chatAPI, uploadAPI, authAPI, reportAPI } from '@/services/api';
 
 const DEFAULT_WELCOME_MESSAGE = {
   id: 'welcome',
@@ -57,6 +58,13 @@ const ChatboxAI = () => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
+
+  // Modal gửi yêu cầu xem xét dữ liệu mới
+  const [isQuickReportOpen, setIsQuickReportOpen] = useState(false);
+  const [quickReportData, setQuickReportData] = useState(null);
+  const [quickReportDescription, setQuickReportDescription] = useState('');
+  const [isSubmittingQuickReport, setIsSubmittingQuickReport] = useState(false);
+  const [quickReportSuccess, setQuickReportSuccess] = useState(false);
 
   const formatTime = (ts) => {
     if (!ts) return '';
@@ -242,6 +250,7 @@ const ChatboxAI = () => {
         text: aiResponse.message || aiResponse.text || '',
         status: aiResponse.status || 'info',
         recommendations: aiResponse.recommendations || [],
+        newDataCheck: aiResponse.newDataCheck || null,
         timestamp: new Date(),
       };
       setMessages((prev) => {
@@ -299,7 +308,7 @@ const ChatboxAI = () => {
   };
 
   const clearChat = () => {
-    chatAPI.clearHistory(sessionId).catch(() => {});
+    chatAPI.clearHistory(sessionId).catch(() => { });
     localStorage.removeItem('aicee_chat_history_' + sessionId);
     setMessages([
       {
@@ -310,6 +319,69 @@ const ChatboxAI = () => {
         timestamp: new Date(),
       },
     ]);
+  };
+
+  const handleOpenQuickReport = (checkData) => {
+    setQuickReportData(checkData);
+    setQuickReportDescription(
+      `Phát hiện nghi vấn qua AI Assistant: Đề nghị xem xét thêm ${checkData.type} "${checkData.target}" vào danh sách cảnh báo của hệ thống.`
+    );
+    setQuickReportSuccess(false);
+    setIsQuickReportOpen(true);
+  };
+
+  const handleNavigateToReportPage = (checkData) => {
+    navigate('/report', {
+      state: {
+        target: checkData.target,
+        type: checkData.type,
+        title: `Yêu cầu xem xét: ${checkData.target}`,
+        description: `Phát hiện nghi vấn qua AI Assistant: Đề nghị xem xét thêm ${checkData.type} "${checkData.target}" vào hệ thống cảnh báo.`
+      }
+    });
+  };
+
+  const handleSubmitQuickReport = async (e) => {
+    e.preventDefault();
+    if (!quickReportData || !quickReportDescription.trim()) return;
+
+    try {
+      setIsSubmittingQuickReport(true);
+      const currentUser = authAPI.getCurrentUser();
+      const payload = {
+        target: quickReportData.target,
+        type: quickReportData.type || 'Khác',
+        title: `Yêu cầu xem xét: ${quickReportData.target}`,
+        description: quickReportDescription.trim(),
+        reporterName: currentUser?.name || 'Người dùng AICEE Chat',
+        reporterEmail: currentUser?.email || ''
+      };
+
+      const res = await reportAPI.createQuick(payload);
+      if (res.success) {
+        setQuickReportSuccess(true);
+        setTimeout(() => {
+          setIsQuickReportOpen(false);
+          setQuickReportSuccess(false);
+        }, 1600);
+
+        // Thêm tin nhắn xác nhận của AI vào khung chat
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now() + 10,
+            type: 'ai',
+            text: `✅ **Đã gửi yêu cầu xem xét thành công!**\n\nMục tiêu **${quickReportData.target}** (${quickReportData.type}) đã được chuyển tới hàng đợi Quản trị viên AICEE ở trạng thái **Chờ duyệt (Pending)**.\n\nSau khi kiểm tra căn cứ và bằng chứng, Ban Quản trị sẽ phê duyệt để tự động đưa vào Danh Sách Cảnh Báo Đen (Blacklist). Cảm ơn bạn đã đóng góp! 🛡️`,
+            status: 'safe',
+            timestamp: new Date()
+          }
+        ]);
+      }
+    } catch (err) {
+      alert(err.message || 'Lỗi khi gửi yêu cầu. Vui lòng thử lại!');
+    } finally {
+      setIsSubmittingQuickReport(false);
+    }
   };
 
   const quickActions = [
@@ -431,9 +503,8 @@ const ChatboxAI = () => {
       <div className="flex-1 overflow-hidden flex min-h-0">
         {/* Sidebar */}
         <aside
-          className={`${
-            isMobileMenuOpen ? 'block' : 'hidden'
-          } md:block w-full md:w-60 bg-white/5 backdrop-blur-md border-r border-white/10 p-4 overflow-y-auto flex-shrink-0`}
+          className={`${isMobileMenuOpen ? 'block' : 'hidden'
+            } md:block w-full md:w-60 bg-white/5 backdrop-blur-md border-r border-white/10 p-4 overflow-y-auto flex-shrink-0`}
         >
           <h3 className="text-white font-semibold mb-4 flex items-center space-x-2 text-sm">
             <Sparkles className="w-4 h-4 text-cyan-400" />
@@ -477,17 +548,15 @@ const ChatboxAI = () => {
                 className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`flex items-start space-x-3 max-w-3xl ${
-                    message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''
-                  }`}
+                  className={`flex items-start space-x-3 max-w-3xl ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''
+                    }`}
                 >
                   {/* Avatar */}
                   <div
-                    className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
-                      message.type === 'user'
-                        ? 'bg-gradient-to-br from-cyan-500 to-blue-500'
-                        : 'bg-gradient-to-br from-purple-500 to-pink-500'
-                    }`}
+                    className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${message.type === 'user'
+                      ? 'bg-gradient-to-br from-cyan-500 to-blue-500'
+                      : 'bg-gradient-to-br from-purple-500 to-pink-500'
+                      }`}
                   >
                     {message.type === 'user' ? (
                       <User className="w-4 h-4 text-white" />
@@ -498,11 +567,10 @@ const ChatboxAI = () => {
 
                   {/* Bubble */}
                   <div
-                    className={`px-4 py-3 rounded-2xl max-w-full ${
-                      message.type === 'user'
-                        ? 'bg-gradient-to-br from-cyan-500 to-blue-500 text-white'
-                        : `border ${getStatusColor(message.status)} text-gray-200`
-                    }`}
+                    className={`px-4 py-3 rounded-2xl max-w-full ${message.type === 'user'
+                      ? 'bg-gradient-to-br from-cyan-500 to-blue-500 text-white'
+                      : `border ${getStatusColor(message.status)} text-gray-200`
+                      }`}
                   >
                     {/* Status badge — chỉ cho AI message có status */}
                     {message.type === 'ai' && message.status && message.status !== 'info' && (
@@ -520,8 +588,8 @@ const ChatboxAI = () => {
                         {message.files.map((fileData, idx) => {
                           const imgSrc = fileData.preview
                             ? (fileData.preview.startsWith('http') || fileData.preview.startsWith('data:')
-                                ? fileData.preview
-                                : `http://localhost:5000${fileData.preview}`)
+                              ? fileData.preview
+                              : `http://localhost:5000${fileData.preview}`)
                             : null;
                           return imgSrc ? (
                             <div key={idx} className="space-y-1">
@@ -573,12 +641,52 @@ const ChatboxAI = () => {
                     {/* Action Button */}
                     {message.action && (
                       <div className="mt-4">
-                        <Link 
-                          to={message.action.to} 
+                        <Link
+                          to={message.action.to}
                           className="inline-block px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-400 hover:to-blue-400 font-medium transition shadow"
                         >
                           {message.action.label}
                         </Link>
+                      </div>
+                    )}
+
+                    {/* Hộp thoại thông minh: Hỏi nếu là dữ liệu mới cần xem xét */}
+                    {message.newDataCheck && message.newDataCheck.isNewData && (
+                      <div className="mt-4 p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/40 via-slate-900/70 to-orange-950/40 border border-amber-500/40 shadow-lg text-left backdrop-blur-xl">
+                        <div className="flex items-start space-x-3">
+                          <div className="p-2 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 shrink-0 mt-0.5">
+                            <HelpCircle className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                Phát hiện dữ liệu mới
+                              </span>
+
+                            </div>
+                            <p className="text-xs text-gray-300 mt-1.5 leading-relaxed">
+                              <strong className="text-white font-mono bg-white/10 px-1.5 py-0.5 rounded">{message.newDataCheck.target}</strong> ({message.newDataCheck.type}) chưa từng được ghi nhận trong danh sách cảnh báo hay an toàn. Bạn có muốn gửi yêu cầu để Ban Quản Trị xem xét và thêm vào hệ thống?
+                            </p>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <button
+                                onClick={() => handleOpenQuickReport(message.newDataCheck)}
+                                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-md shadow-amber-500/20 transition-all active:scale-95"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                                <span>Gửi Yêu Cầu Xem Xét Nhanh</span>
+                              </button>
+
+                              <button
+                                onClick={() => handleNavigateToReportPage(message.newDataCheck)}
+                                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white text-xs font-medium flex items-center space-x-1.5 border border-white/10 transition-all"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span>Điền Form Chi Tiết</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
 
@@ -701,6 +809,93 @@ const ChatboxAI = () => {
           </div>
         </main>
       </div>
+
+      {/* ── Quick Report Modal (Gửi yêu cầu xem xét dữ liệu mới) ── */}
+      {isQuickReportOpen && quickReportData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="relative w-full max-w-lg p-6 sm:p-7 rounded-3xl bg-slate-900/95 border border-amber-500/30 shadow-2xl shadow-amber-500/10 text-white space-y-5">
+            <button
+              onClick={() => setIsQuickReportOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3">
+              <div className="p-3 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Gửi Yêu Cầu Xem Xét Dữ Liệu</h3>
+                <p className="text-xs text-gray-400">Dữ liệu mới sẽ được đưa vào hàng đợi xác minh của Admin</p>
+              </div>
+            </div>
+
+            {quickReportSuccess ? (
+              <div className="py-8 text-center space-y-3">
+                <div className="w-14 h-14 mx-auto rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                  <Check className="w-8 h-8" />
+                </div>
+                <h4 className="text-base font-bold text-white">Yêu Cầu Đã Được Gửi!</h4>
+                <p className="text-xs text-gray-300">Đội ngũ Ban Quản Trị AICEE sẽ thẩm định và cập nhật vào hệ thống cảnh báo.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitQuickReport} className="space-y-4">
+                <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-gray-400 block mb-0.5">Mục tiêu phát hiện:</span>
+                    <span className="font-mono text-sm font-bold text-amber-300">{quickReportData.target}</span>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-semibold uppercase tracking-wider text-[11px]">
+                    {quickReportData.type}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                    Lý do / Mô tả nghi vấn:
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={quickReportDescription}
+                    onChange={(e) => setQuickReportDescription(e.target.value)}
+                    required
+                    placeholder="Mô tả hành vi lừa đảo hoặc lý do bạn nghi ngờ số/email/link này..."
+                    className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 text-xs focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end space-x-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickReportOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium transition"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingQuickReport || !quickReportDescription.trim()}
+                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs flex items-center space-x-2 shadow-lg disabled:opacity-50 transition"
+                  >
+                    {isSubmittingQuickReport ? (
+                      <>
+                        <Loader className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang gửi...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Xác Nhận Gửi</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

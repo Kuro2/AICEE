@@ -91,7 +91,10 @@ function analyzeWithHeuristic(message) {
   }
 
   if (hasPhone) {
-    return { type: 'phone', status: 'danger', details: {} };
+    if (hasSuspiciousKeyword || hasSensitiveRequest || lower.includes('lừa đảo') || lower.includes('đòi tiền') || lower.includes('mạo danh') || lower.includes('chuyển tiền') || lower.includes('đe dọa')) {
+      return { type: 'phone', status: 'danger', details: {} };
+    }
+    return { type: 'phone', status: 'info', details: {} };
   }
 
   if (isSafetyQuestion) {
@@ -126,6 +129,11 @@ function getMockResponse(message) {
       }
     },
     phone: {
+      info: {
+        text: `📱 **Xác minh Số Điện Thoại**\n\nℹ️ **THÔNG TIN** — Định dạng số điện thoại hợp lệ.\n\n🛡️ **Chi tiết kiểm tra:**\n• Cú pháp số điện thoại Việt Nam chuẩn ✓\n• Không nằm trong danh sách đen cảnh báo của hệ thống ✓\n\n💡 **Khuyên dùng:** Nếu số này có gọi điện giả danh cơ quan, đòi OTP hoặc chuyển tiền, hãy thận trọng và báo cáo.`,
+        status: 'info',
+        recommendations: ['Không chia sẻ mã OTP hoặc mật khẩu với bất kỳ ai', 'Xác minh danh tính nếu người gọi xưng là cơ quan chức năng']
+      },
       danger: {
         text: `📱 **Xác minh Số Điện Thoại**\n\n❌ **NGUY HIỂM** — Số này có dấu hiệu lừa đảo!\n\n📊 **Báo cáo từ cộng đồng:**\n• Đã có nhiều người báo cáo bị lừa đảo\n• Mạo danh ngân hàng / cơ quan nhà nước\n• Yêu cầu chuyển tiền hoặc cung cấp OTP\n• Gọi điện nhiều lần trong ngày\n\n🚫 **Không** trả lời, không cung cấp thông tin!`,
         status: 'danger',
@@ -164,9 +172,9 @@ async function sendToGemini(message, history = []) {
   try {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     // Sử dụng đúng tên model và cấu hình systemInstruction đúng chuẩn
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
-      systemInstruction: SYSTEM_PROMPT 
+    const model = genAI.getGenerativeModel({
+      model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
+      systemInstruction: SYSTEM_PROMPT
     });
 
     // Lọc lịch sử hợp lệ và đổi role từ 'ai' thành 'model' nếu có
@@ -187,7 +195,7 @@ async function sendToGemini(message, history = []) {
 
     // Loại bỏ emoji khỏi input của user để tránh lỗi
     const cleanMessage = message.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{200D}\u{FE0F}]/gu, '');
-    
+
     // Gửi trực tiếp nội dung người dùng (không gộp SYSTEM_PROMPT vào đây nữa)
     const result = await chat.sendMessage(cleanMessage);
     let responseText = result.response.text().trim();
@@ -228,15 +236,15 @@ async function analyzeFile(fileName, fileType, fileContent) {
   const isImage = fileType.startsWith('image/');
   const baseResponse = isImage
     ? {
-        text: `🖼️ **Phân tích hình ảnh: ${fileName}**\n\n✅ **KẾT QUẢ: AN TOÀN**\n\n🔎 **Chi tiết kiểm tra:**\n• Không phát hiện malware ẩn trong metadata\n• Không có steganography đáng ngờ\n• Định dạng file hợp lệ\n• Không phát hiện QR code lừa đảo\n\n💡 Hình ảnh an toàn để xem và chia sẻ.`,
-        status: 'safe',
-        recommendations: ['Luôn tải ảnh từ nguồn đáng tin cậy', 'Không mở ảnh từ email lạ']
-      }
+      text: `🖼️ **Phân tích hình ảnh: ${fileName}**\n\n✅ **KẾT QUẢ: AN TOÀN**\n\n🔎 **Chi tiết kiểm tra:**\n• Không phát hiện malware ẩn trong metadata\n• Không có steganography đáng ngờ\n• Định dạng file hợp lệ\n• Không phát hiện QR code lừa đảo\n\n💡 Hình ảnh an toàn để xem và chia sẻ.`,
+      status: 'safe',
+      recommendations: ['Luôn tải ảnh từ nguồn đáng tin cậy', 'Không mở ảnh từ email lạ']
+    }
     : {
-        text: `📄 **Phân tích file: ${fileName}**\n\n✅ **KẾT QUẢ: AN TOÀN**\n\n🔎 **Chi tiết kiểm tra:**\n• Không phát hiện virus hoặc mã độc\n• Không có macro nguy hiểm\n• Cấu trúc file hợp lệ\n• Không phát hiện script ẩn\n\n💡 File an toàn để mở và sử dụng.`,
-        status: 'safe',
-        recommendations: ['Luôn cập nhật phần mềm mở file', 'Không tải file từ nguồn không rõ ràng']
-      };
+      text: `📄 **Phân tích file: ${fileName}**\n\n✅ **KẾT QUẢ: AN TOÀN**\n\n🔎 **Chi tiết kiểm tra:**\n• Không phát hiện virus hoặc mã độc\n• Không có macro nguy hiểm\n• Cấu trúc file hợp lệ\n• Không phát hiện script ẩn\n\n💡 File an toàn để mở và sử dụng.`,
+      status: 'safe',
+      recommendations: ['Luôn cập nhật phần mềm mở file', 'Không tải file từ nguồn không rõ ràng']
+    };
 
   if (!GEMINI_API_KEY) return baseResponse;
   return baseResponse; // Với Gemini có thể gửi vision API ở đây
