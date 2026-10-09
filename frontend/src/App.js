@@ -20,6 +20,8 @@ import QuizEmail from '@/pages/QuizEmail';
 import Pricing from '@/pages/Pricing';
 import AiHistory from '@/pages/AiHistory';
 import ReportScam from '@/pages/ReportScam';
+import PaymentSuccess from '@/pages/PaymentSuccess';
+import PaymentFailed from '@/pages/PaymentFailed';
 
 // Admin Pages
 import AdminLayout from '@/components/AdminLayout';
@@ -42,6 +44,10 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/payment/success" element={<PaymentSuccess />} />
+            <Route path="/payment/failed" element={<PaymentFailed />} />
+            <Route path="/payment/cancel" element={<PaymentFailed />} />
+            <Route path="/payment/error" element={<PaymentFailed />} />
             <Route path="/chatbox" element={<ChatboxAI />} />
             <Route path="/ai-history" element={<AiHistory />} />
             <Route path="/report" element={<ReportScam />} />

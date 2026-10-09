@@ -270,12 +270,12 @@ const AdminNews = () => {
                     onChange={(e) => setFormData({...formData, category: e.target.value})}
                     className="w-full p-3.5 bg-[#1e293b] border border-slate-700/80 rounded-xl text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all text-sm"
                   >
-                    <option>Cảnh báo lừa đảo</option>
-                    <option>Cập nhật sản phẩm</option>
-                    <option>Kiến thức an toàn</option>
-                    <option>Báo cáo bảo mật</option>
-                    <option>Cảnh báo mới</option>
-                    <option>Hướng dẫn</option>
+                    <option className="bg-slate-900 text-white">Cảnh báo lừa đảo</option>
+                    <option className="bg-slate-900 text-white">Cập nhật sản phẩm</option>
+                    <option className="bg-slate-900 text-white">Kiến thức an toàn</option>
+                    <option className="bg-slate-900 text-white">Báo cáo bảo mật</option>
+                    <option className="bg-slate-900 text-white">Cảnh báo mới</option>
+                    <option className="bg-slate-900 text-white">Hướng dẫn</option>
                   </select>
                 </div>
 

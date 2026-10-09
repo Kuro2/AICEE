@@ -325,6 +325,12 @@ export const paymentAPI = {
 
   getBankInfo: () =>
     request('GET', '/payment/bank-info'),
+
+  create: (planType) => request('POST', '/payment/create', { planType }),
+  getOrderDetail: (orderId) => request('GET', `/payment/order/${orderId}`),
+  getHistory: () => request('GET', '/payment/history'),
+  simulate: (orderId, status = 'success') =>
+    request('POST', '/payment/simulate', { orderId, status }),
 };
 
 // ── Report API ───────────────────────────────────────────────

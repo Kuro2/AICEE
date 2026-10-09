@@ -1,3 +1,11 @@
+const dns = require('dns');
+// Khắc phục lỗi querySrv ECONNREFUSED do DNS nhà mạng không phân giải được MongoDB Atlas SRV
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch (e) {
+  console.warn('DNS server override failed:', e.message);
+}
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');

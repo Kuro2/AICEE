@@ -71,7 +71,6 @@ const Header = () => {
             ))}
           </nav>
 
-          {/* Action Buttons */}
           <div className="hidden md:flex items-center space-x-3">
             {/* Nút Báo Cáo phong cách nổi bật như nút Đăng nhập */}
             <Link
@@ -82,6 +81,15 @@ const Header = () => {
               Báo Cáo
             </Link>
 
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => navigate('/admin')}
+                className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.35)] hover:scale-[1.02] active:scale-95 transition-all font-bold text-xs flex items-center gap-1.5"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>Trang Admin</span>
+              </button>
+            )}
             <button 
               onClick={() => navigate('/chatbox')}
               className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:scale-[1.02] active:scale-95 transition-all font-semibold text-sm flex items-center gap-2"
@@ -151,6 +159,14 @@ const Header = () => {
               <ShieldAlert className="w-4 h-4" />
               Báo Cáo Lừa Đảo
             </Link>
+            {user?.role === 'admin' && (
+              <Link
+                to="/admin"
+                className="block text-purple-300 bg-purple-500/10 border border-purple-500/30 py-2.5 px-4 rounded-xl font-bold text-sm text-center"
+              >
+                🛡️ Bảng Điều Khiển Admin
+              </Link>
+            )}
             <button 
               onClick={() => navigate('/chatbox')}
               className="w-full px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl transition-all font-semibold flex justify-center items-center gap-2"

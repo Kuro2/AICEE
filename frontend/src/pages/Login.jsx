@@ -24,8 +24,9 @@ const Login = () => {
         setMessage(null);
         const result = await authAPI.googleLogin(tokenResponse.access_token);
         if (result.success) {
-          setMessage({ type: 'success', text: 'Đăng nhập Google thành công!' });
-          setTimeout(() => navigate('/'), 1000);
+          const isAdmin = result.data?.user?.role === 'admin';
+          setMessage({ type: 'success', text: isAdmin ? 'Đăng nhập Quản trị viên thành công! Đang vào trang Admin...' : 'Đăng nhập Google thành công!' });
+          setTimeout(() => navigate(isAdmin ? '/admin' : '/'), 1000);
         } else {
           setMessage({ type: 'error', text: result.message || 'Lỗi đăng nhập Google' });
         }
@@ -47,8 +48,9 @@ const Login = () => {
         setMessage(null);
         const result = await authAPI.facebookLogin(response.accessToken);
         if (result.success) {
-          setMessage({ type: 'success', text: 'Đăng nhập Facebook thành công!' });
-          setTimeout(() => navigate('/'), 1000);
+          const isAdmin = result.data?.user?.role === 'admin';
+          setMessage({ type: 'success', text: isAdmin ? 'Đăng nhập Quản trị viên thành công! Đang vào trang Admin...' : 'Đăng nhập Facebook thành công!' });
+          setTimeout(() => navigate(isAdmin ? '/admin' : '/'), 1000);
         } else {
           setMessage({ type: 'error', text: result.message || 'Lỗi đăng nhập Facebook' });
         }
@@ -100,11 +102,14 @@ const Login = () => {
       }
 
       if (result.success) {
+        const isAdmin = result.data?.user?.role === 'admin';
         setMessage({
           type: 'success',
-          text: isRegisterMode ? 'Đăng ký thành công! Đang chuyển hướng...' : 'Đăng nhập thành công!',
+          text: isRegisterMode
+            ? 'Đăng ký thành công! Đang chuyển hướng...'
+            : (isAdmin ? 'Đăng nhập Quản trị viên thành công! Đang vào trang Admin...' : 'Đăng nhập thành công!'),
         });
-        setTimeout(() => navigate('/'), 1000);
+        setTimeout(() => navigate(isAdmin ? '/admin' : '/'), 1000);
       } else {
         setMessage({ type: 'error', text: result.message || 'Có lỗi xảy ra.' });
       }
