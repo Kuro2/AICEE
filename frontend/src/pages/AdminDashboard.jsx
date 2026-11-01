@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { adminAPI } from '@/services/api';
-import { Users, FileText, ShieldAlert, Activity, ShieldCheck, ArrowUpRight, Plus, AlertTriangle, Sparkles } from 'lucide-react';
+import { Users, FileText, ShieldAlert, Activity, ShieldCheck, ArrowUpRight, Plus, AlertTriangle, Sparkles, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const AdminDashboard = () => {
@@ -55,10 +55,10 @@ const AdminDashboard = () => {
       color: 'from-purple-500/10 to-indigo-500/5 border-purple-500/30'
     },
     { 
-      title: 'Trạng Thái Hệ Thống AI', 
-      value: 'Hoạt Động Tốt', 
-      change: '99.98% Uptime',
-      icon: <Activity className="w-6 h-6 text-emerald-400" />,
+      title: 'Lượt Tin Nhắn Chat AI', 
+      value: stats?.totalChatMessages || 0, 
+      change: `${stats?.totalChatSessions || 0} phiên hội thoại`,
+      icon: <MessageSquare className="w-6 h-6 text-cyan-400" />,
       color: 'from-emerald-500/10 to-cyan-500/5 border-emerald-500/30'
     },
   ];
@@ -127,7 +127,7 @@ const AdminDashboard = () => {
           <h2 className="text-xl font-bold text-white mb-2">Chức Năng Quản Lý Trực Quan</h2>
           <p className="text-gray-400 text-xs sm:text-sm mb-6">Truy cập nhanh các phân hệ nghiệp vụ chính của nền tảng.</p>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             <Link
               to="/admin/reports"
               className="p-5 rounded-2xl bg-red-500/10 hover:bg-red-500/15 border border-red-500/30 hover:border-red-500/50 transition-all group shadow-lg shadow-red-500/10"
@@ -138,6 +138,18 @@ const AdminDashboard = () => {
                 <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
               </h3>
               <p className="text-xs text-gray-300">Xác minh bằng chứng và thêm vào Blacklist.</p>
+            </Link>
+
+            <Link
+              to="/admin/chats"
+              className="p-5 rounded-2xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-500/50 transition-all group shadow-lg shadow-cyan-500/10"
+            >
+              <MessageSquare className="w-6 h-6 text-cyan-400 mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-bold text-white text-sm mb-1 flex items-center justify-between">
+                <span>Lịch Sử Chat AI</span>
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded font-mono">Mới</span>
+              </h3>
+              <p className="text-xs text-gray-300">Theo dõi toàn bộ tin nhắn tư vấn và cảnh báo an ninh.</p>
             </Link>
 
             <Link

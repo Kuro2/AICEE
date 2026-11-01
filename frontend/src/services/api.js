@@ -303,7 +303,26 @@ export const adminAPI = {
   // Admin News CRUD (calls the new protected news endpoints)
   createNews: (data) => request('POST', '/news', data),
   updateNews: (id, data) => request('PUT', `/news/${id}`, data),
-  deleteNews: (id) => request('DELETE', `/news/${id}`)
+  deleteNews: (id) => request('DELETE', `/news/${id}`),
+
+  // Admin Chat Conversations
+  getChatConversations: (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.append('page', params.page);
+    if (params.limit) searchParams.append('limit', params.limit);
+    if (params.search) searchParams.append('search', params.search);
+    if (params.userId) searchParams.append('userId', params.userId);
+    if (params.userType) searchParams.append('userType', params.userType);
+    if (params.status) searchParams.append('status', params.status);
+    const queryString = searchParams.toString();
+    return request('GET', `/admin/chats/conversations${queryString ? `?${queryString}` : ''}`);
+  },
+  getChatConversationDetail: (sessionId) =>
+    request('GET', `/admin/chats/conversations/${encodeURIComponent(sessionId)}`),
+  deleteChatSession: (sessionId) =>
+    request('DELETE', `/admin/chats/conversations/${encodeURIComponent(sessionId)}`),
+  deleteChatMessage: (id) =>
+    request('DELETE', `/admin/chats/messages/${id}`)
 };
 
 // ── Subscription API ──────────────────────────────────────

@@ -28,6 +28,7 @@ import AdminUsers from '@/pages/AdminUsers';
 import AdminResources from '@/pages/AdminResources';
 import AdminNews from '@/pages/AdminNews';
 import AdminReports from '@/pages/AdminReports';
+import AdminChats from '@/pages/AdminChats';
 
 function App() {
   return (
@@ -62,6 +63,7 @@ function App() {
               <Route path="resources" element={<AdminResources />} />
               <Route path="news" element={<AdminNews />} />
               <Route path="reports" element={<AdminReports />} />
+              <Route path="chats" element={<AdminChats />} />
             </Route>
           </Routes>
         </BrowserRouter>

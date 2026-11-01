@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { adminAPI } from '@/services/api';
-import { Shield, ShieldAlert, Trash2, Loader, Mail } from 'lucide-react';
+import { Shield, ShieldAlert, Trash2, Loader, Mail, MessageSquare } from 'lucide-react';
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
@@ -95,6 +96,13 @@ const AdminUsers = () => {
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex justify-end gap-2">
+                      <Link 
+                        to={`/admin/chats?userId=${user.id}`}
+                        className="p-2 bg-white/10 hover:bg-purple-500/20 text-gray-400 hover:text-purple-400 rounded-lg transition-colors"
+                        title="Xem lịch sử tin nhắn AI"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                      </Link>
                       <button 
                         onClick={() => handleRoleChange(user.id, user.role)}
                         className="p-2 bg-white/10 hover:bg-cyan-500/20 text-gray-400 hover:text-cyan-400 rounded-lg transition-colors"
