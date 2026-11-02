@@ -121,7 +121,6 @@ setLoading(true);
       alert(error.message || 'Không thể kết nối đến cổng thanh toán SePay');
     } finally {
       setLoading(false);
-  };
     }
   };
 
