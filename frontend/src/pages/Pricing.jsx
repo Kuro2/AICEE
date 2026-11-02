@@ -96,8 +96,7 @@ const Pricing = () => {
     }
     
     if (planId === 'free') return; 
-
-    setLoading(true);
+setLoading(true);
     try {
       // Tạo đơn hàng thanh toán SePay trên Backend
       const res = await paymentAPI.createOrder(planId, billingCycle);
@@ -122,6 +121,7 @@ const Pricing = () => {
       alert(error.message || 'Không thể kết nối đến cổng thanh toán SePay');
     } finally {
       setLoading(false);
+  };
     }
   };
 
@@ -385,7 +385,7 @@ const Pricing = () => {
 
       {/* SePay Automated Payment Modal */}
       {paymentModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in duration-300">
+<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in duration-300">
           <div className="bg-[#0a0a0a] border border-cyan-500/30 rounded-[2.5rem] p-6 sm:p-8 max-w-lg w-full relative shadow-[0_0_60px_rgba(6,182,212,0.25)] overflow-hidden max-h-[92vh] overflow-y-auto">
             {/* Modal Decorative background glow */}
             <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-cyan-600/20 to-transparent rounded-t-[2.5rem] pointer-events-none"></div>

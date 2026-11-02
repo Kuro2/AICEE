@@ -226,7 +226,7 @@ router.post('/google', async (req, res) => {
       headers: { Authorization: `Bearer ${token}` }
     });
     const payload = response.data;
-    
+
     // Tìm hoặc tạo user
     const profile = {
       email: payload.email,
@@ -273,7 +273,7 @@ router.post('/facebook', async (req, res) => {
     // Lấy thông tin user từ Graph API
     const response = await axios.get(`https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`);
     const payload = response.data;
-    
+
     // Tạo email giả nếu user đăng ký FB bằng số điện thoại
     const email = payload.email || `${payload.id}@facebook.aicee.com`;
 

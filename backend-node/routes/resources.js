@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
   try {
     const { isSafe } = req.query;
     let query = {};
-    
+
     if (isSafe !== undefined) {
       query.isSafe = isSafe === 'true';
     }
@@ -43,7 +43,7 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
     if (!type || !address) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập loại và địa chỉ' });
     }
-    
+
     const newResource = new Resource({
       isSafe: isSafe === true || isSafe === 'true',
       type,
@@ -51,7 +51,7 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
       address,
       description: description || ''
     });
-    
+
     await newResource.save();
     res.json({ success: true, message: 'Đã thêm tài nguyên', data: newResource });
   } catch (error) {

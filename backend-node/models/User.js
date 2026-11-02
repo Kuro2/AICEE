@@ -108,7 +108,7 @@ async function verifyLogin(email, password) {
 async function updateUser(id, updates) {
   if (!mongoose.Types.ObjectId.isValid(id)) return null;
   const { id: _id, email, password, ...safeUpdates } = updates;
-  
+
   const user = await UserModel.findByIdAndUpdate(id, safeUpdates, { new: true });
   const userObj = formatUser(user);
   if (userObj) delete userObj.password;
@@ -118,10 +118,10 @@ async function updateUser(id, updates) {
 async function findOrCreateSocialUser(profile) {
   try {
     const { email, name, avatar, provider, providerId } = profile;
-    
+
     // Tìm user bằng email
     let user = await UserModel.findOne({ email: email.toLowerCase() });
-    
+
     if (user) {
       // Nếu user đã tồn tại, cập nhật providerId nếu chưa có
       if (provider === 'google' && !user.googleId) {
@@ -129,7 +129,7 @@ async function findOrCreateSocialUser(profile) {
       } else if (provider === 'facebook' && !user.facebookId) {
         user.facebookId = providerId;
       }
-      
+
       // Cập nhật avatar nếu user chưa có
       if (avatar && !user.avatar) {
         user.avatar = avatar;
@@ -139,7 +139,7 @@ async function findOrCreateSocialUser(profile) {
       if (name && !user.name) {
         user.name = name;
       }
-      
+
       user.lastLogin = new Date();
       await user.save();
     } else {
@@ -164,12 +164,12 @@ async function findOrCreateSocialUser(profile) {
   }
 }
 
-module.exports = { 
-  UserModel, 
-  findUserByEmail, 
-  findUserById, 
-  createUser, 
-  verifyLogin, 
+module.exports = {
+  UserModel,
+  findUserByEmail,
+  findUserById,
+  createUser,
+  verifyLogin,
   updateUser,
   findOrCreateSocialUser
 };
