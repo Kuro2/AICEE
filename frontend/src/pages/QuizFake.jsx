@@ -1,51 +1,89 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { ArrowLeft, CheckCircle2, XCircle, Trophy, RotateCcw, ShieldCheck, AlertTriangle, Sparkles, HelpCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Trophy, RotateCcw, ShieldCheck, AlertTriangle, Sparkles, HelpCircle, Loader } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { quizAPI } from '@/services/api';
+
+const DEFAULT_QUESTIONS = [
+  {
+    id: 1,
+    title: 'Tình huống 1: Đường link tra cứu hóa đơn tiền điện',
+    url: 'https://cskh.evnspc.vn/tra-cuu-tien-dien',
+    context: 'Bạn nhận được tin nhắn báo tiền điện tháng này với đường dẫn trên. Đây là website thật hay giả?',
+    isReal: true,
+    explanation: 'Đây là website THẬT. Tên miền kết thúc bằng đuôi chính thức của Tổng công ty Điện lực Miền Nam (evnspc.vn) và sử dụng giao thức HTTPS an toàn.',
+  },
+  {
+    id: 2,
+    title: 'Tình huống 2: Link đăng nhập nhận trợ cấp an sinh xã hội',
+    url: 'http://baohiemxahoi-vietnam.online/nhan-tro-cap-tet',
+    context: 'Tin nhắn SMS Brandname thông báo bạn được nhận trợ cấp 2.500.000đ và yêu cầu nhấn vào link trên.',
+    isReal: false,
+    explanation: 'Đây là website GIẢ MẠO! Cổng thông tin BHXH Việt Nam chính thức là baohiemxahoi.gov.vn (đuôi .gov.vn của cơ quan nhà nước), không dùng đuôi lạ như .online và không dùng giao thức http không bảo mật.',
+  },
+  {
+    id: 3,
+    title: 'Tình huống 3: Cổng xác thực sinh trắc học ngân hàng',
+    url: 'https://vietcombank.com.vn-xacthuc-khachhang.cc',
+    context: 'Một email thông báo bạn phải cập nhật sinh trắc học khuôn mặt trước 24h nếu không sẽ bị khóa tài khoản.',
+    isReal: false,
+    explanation: 'Đây là bẫy lừa đảo PHISHING tinh vi! Kẻ gian ghép tên vietcombank vào phần đầu (subdomain), nhưng tên miền gốc thực chất là .cc! Ngân hàng Vietcombank chỉ dùng vietcombank.com.vn.',
+  },
+  {
+    id: 4,
+    title: 'Tình huống 4: Cổng Dịch Vụ Công Quốc Gia',
+    url: 'https://dichvucong.gov.vn',
+    context: 'Bạn truy cập để làm thủ tục cấp đổi giấy phép lái xe và định danh điện tử.',
+    isReal: true,
+    explanation: 'Đây là website CHÍNH THỐNG của Chính phủ Việt Nam với tên miền đuôi cấp 1 .gov.vn được bảo vệ nghiêm ngặt.',
+  },
+];
 
 const QuizFake = () => {
-  const questions = [
-    {
-      id: 1,
-      title: 'Tình huống 1: Đường link tra cứu hóa đơn tiền điện',
-      url: 'https://cskh.evnspc.vn/tra-cuu-tien-dien',
-      context: 'Bạn nhận được tin nhắn báo tiền điện tháng này với đường dẫn trên. Đây là website thật hay giả?',
-      isReal: true,
-      explanation: 'Đây là website THẬT. Tên miền kết thúc bằng đuôi chính thức của Tổng công ty Điện lực Miền Nam (evnspc.vn) và sử dụng giao thức HTTPS an toàn.',
-    },
-    {
-      id: 2,
-      title: 'Tình huống 2: Link đăng nhập nhận trợ cấp an sinh xã hội',
-      url: 'http://baohiemxahoi-vietnam.online/nhan-tro-cap-tet',
-      context: 'Tin nhắn SMS Brandname thông báo bạn được nhận trợ cấp 2.500.000đ và yêu cầu nhấn vào link trên.',
-      isReal: false,
-      explanation: 'Đây là website GIẢ MẠO! Cổng thông tin BHXH Việt Nam chính thức là baohiemxahoi.gov.vn (đuôi .gov.vn của cơ quan nhà nước), không dùng đuôi lạ như .online và không dùng giao thức http không bảo mật.',
-    },
-    {
-      id: 3,
-      title: 'Tình huống 3: Cổng xác thực sinh trắc học ngân hàng',
-      url: 'https://vietcombank.com.vn-xacthuc-khachhang.cc',
-      context: 'Một email thông báo bạn phải cập nhật sinh trắc học khuôn mặt trước 24h nếu không sẽ bị khóa tài khoản.',
-      isReal: false,
-      explanation: 'Đây là bẫy lừa đảo PHISHING tinh vi! Kẻ gian ghép tên vietcombank vào phần đầu (subdomain), nhưng tên miền gốc thực chất là .cc! Ngân hàng Vietcombank chỉ dùng vietcombank.com.vn.',
-    },
-    {
-      id: 4,
-      title: 'Tình huống 4: Cổng Dịch Vụ Công Quốc Gia',
-      url: 'https://dichvucong.gov.vn',
-      context: 'Bạn truy cập để làm thủ tục cấp đổi giấy phép lái xe và định danh điện tử.',
-      isReal: true,
-      explanation: 'Đây là website CHÍNH THỐNG của Chính phủ Việt Nam với tên miền đuôi cấp 1 .gov.vn được bảo vệ nghiêm ngặt.',
-    },
-  ];
-
+  const [questions, setQuestions] = useState(DEFAULT_QUESTIONS);
+  const [loading, setLoading] = useState(false);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null); // true = Real, false = Fake
   const [score, setScore] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  const currentQ = questions[currentIdx];
+  // Tải câu hỏi động từ Ngân hàng đề thi AICEE
+  const fetchDynamicQuestions = async () => {
+    setLoading(true);
+    try {
+      const res = await quizAPI.getRandom({ type: 'url', limit: 6 });
+      if (res.success && Array.isArray(res.data?.questions) && res.data.questions.length > 0) {
+        const mapped = res.data.questions.map((q, idx) => {
+          const urlMatch = q.title.match(/(https?:\/\/[^\s"']+)/i) || q.explanation.match(/(https?:\/\/[^\s"']+)/i);
+          const foundUrl = urlMatch ? urlMatch[0] : (q.title.includes('http') ? q.title : 'https://' + q.title.split(' ')[0]);
+
+          const realOption = q.options?.find(o => /thật|chính thống|an toàn|hợp lệ/i.test(o.text));
+          const isReal = realOption ? realOption.isCorrect : !(/lừa đảo|giả mạo|phishing|nguy hiểm/i.test(q.title));
+
+          return {
+            id: q.id || idx + 1,
+            title: q.title,
+            url: foundUrl.replace(/["'()]/g, ''),
+            context: 'Hãy phân tích đường link và kiểm tra xem đây là website chính thống hay bẫy lừa đảo.',
+            isReal,
+            explanation: q.explanation || 'Hãy chú ý kiểm tra tên miền gốc trước khi nhập bất kỳ thông tin nào.'
+          };
+        });
+        setQuestions(mapped);
+      }
+    } catch (err) {
+      console.warn('Chưa thể tải câu hỏi động, dùng câu hỏi mẫu:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDynamicQuestions();
+  }, []);
+
+  const currentQ = questions[currentIdx] || DEFAULT_QUESTIONS[0];
 
   const handleSelect = (choice) => {
     if (selectedAnswer !== null) return;
@@ -65,6 +103,7 @@ const QuizFake = () => {
   };
 
   const handleRestart = () => {
+    fetchDynamicQuestions();
     setCurrentIdx(0);
     setSelectedAnswer(null);
     setScore(0);

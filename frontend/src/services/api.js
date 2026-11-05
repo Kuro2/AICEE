@@ -322,7 +322,73 @@ export const adminAPI = {
   deleteChatSession: (sessionId) =>
     request('DELETE', `/admin/chats/conversations/${encodeURIComponent(sessionId)}`),
   deleteChatMessage: (id) =>
-    request('DELETE', `/admin/chats/messages/${id}`)
+    request('DELETE', `/admin/chats/messages/${id}`),
+
+  // Admin Quiz Management
+  getQuizzes: (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.append('page', params.page);
+    if (params.limit) searchParams.append('limit', params.limit);
+    if (params.type) searchParams.append('type', params.type);
+    if (params.difficulty) searchParams.append('difficulty', params.difficulty);
+    if (params.search) searchParams.append('search', params.search);
+    const queryString = searchParams.toString();
+    return request('GET', `/admin/quiz${queryString ? `?${queryString}` : ''}`);
+  },
+  generateQuiz: (data) => request('POST', '/admin/quiz/generate', data),
+  bulkSaveQuiz: (questions) => request('POST', '/admin/quiz/bulk-save', { questions }),
+  updateQuiz: (id, data) => request('PUT', `/admin/quiz/${id}`, data),
+  deleteQuiz: (id) => request('DELETE', `/admin/quiz/${id}`),
+  downloadQuizTemplate: async () => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/admin/quiz/template`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+    });
+    if (!res.ok) throw new Error('Không thể tải file mẫu');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'AICEE_Quiz_Template.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  },
+  exportQuizExcel: async (questions = []) => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/admin/quiz/export-excel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ questions })
+    });
+    if (!res.ok) throw new Error('Lỗi xuất file Excel');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `AICEE_Quiz_Export_${Date.now()}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  },
+  importQuizExcel: async (file) => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_BASE}/admin/quiz/import-excel`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Lỗi đọc file Excel');
+    return data;
+  }
 };
 
 // ── Subscription API ──────────────────────────────────────
@@ -406,4 +472,17 @@ export const reportAPI = {
    * Xóa báo cáo
    */
   delete: (id) => request('DELETE', `/reports/${id}`),
+};
+
+// ── Public Quiz API ─────────────────────────────────────────
+export const quizAPI = {
+  getRandom: (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.type) searchParams.append('type', params.type);
+    if (params.difficulty) searchParams.append('difficulty', params.difficulty);
+    if (params.limit) searchParams.append('limit', params.limit);
+    const queryString = searchParams.toString();
+    return request('GET', `/quiz${queryString ? `?${queryString}` : ''}`);
+  },
+  getStats: () => request('GET', '/quiz/stats')
 };

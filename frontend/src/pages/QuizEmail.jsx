@@ -1,59 +1,99 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { ArrowLeft, CheckCircle2, XCircle, Trophy, RotateCcw, Mail, AlertTriangle, ShieldCheck, Sparkles, Paperclip, ExternalLink } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Trophy, RotateCcw, Mail, AlertTriangle, ShieldCheck, Sparkles, Paperclip, ExternalLink, Loader } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { quizAPI } from '@/services/api';
+
+const DEFAULT_EMAILS = [
+  {
+    id: 1,
+    sender: 'Techcombank Support <security-alert@techcom-security.net>',
+    subject: '🚨 CẢNH BÁO: Tài khoản của bạn sẽ bị tạm ngưng sau 12 giờ',
+    date: 'Hôm nay, 10:45 AM',
+    body: 'Kính gửi Quý khách,\n\nHệ thống ghi nhận một lượt đăng nhập bất thường từ thiết bị lạ tại Singapore. Để đảm bảo an toàn, vui lòng truy cập đường dẫn dưới đây và nhập mã OTP xác thực hủy giao dịch ngay lập tức.\n\nNếu không thực hiện trong vòng 12h, tài khoản của bạn sẽ bị đóng băng vĩnh viễn.',
+    linkText: '👉 Nhấp vào đây để xác minh tài khoản an toàn',
+    isPhishing: true,
+    explanation: 'Đây là EMAIL LỪA ĐẢO NGUY HIỂM! Ngân hàng không bao giờ gửi mail từ đuôi lạ như @techcom-security.net (tên miền chính thức là techcombank.com.vn). Thủ đoạn tạo áp lực thời gian "sau 12 giờ" và đòi hỏi mã OTP là đặc trưng của tội phạm mạng.',
+  },
+  {
+    id: 2,
+    sender: 'Google Security <no-reply@accounts.google.com>',
+    subject: 'Cảnh báo bảo mật: Thiết bị mới vừa đăng nhập',
+    date: 'Hôm qua, 18:20 PM',
+    body: 'Tài khoản Google của bạn vừa được đăng nhập trên Windows (Chrome) tại Hà Nội, Việt Nam.\n\nNếu đây là bạn, bạn không cần làm gì cả. Nếu đây không phải là bạn, hãy kiểm tra hoạt động thiết bị và bảo mật tài khoản trong Cài đặt Google.',
+    linkText: 'Kiểm tra hoạt động thiết bị',
+    isPhishing: false,
+    explanation: 'Đây là EMAIL CHÍNH HÃNG từ Google (@accounts.google.com). Google thông báo sự kiện bảo mật bình thường và không hề yêu cầu bạn cung cấp mật khẩu hay mã OTP qua email.',
+  },
+  {
+    id: 3,
+    sender: 'Netflix Billing <support-payment@netflix-member-renew.xyz>',
+    subject: 'Thanh toán gói thuê bao tháng này không thành công',
+    date: '3 ngày trước',
+    body: 'Gói đăng ký Netflix của bạn đã bị từ chối thanh toán. Vui lòng cập nhật thông tin thẻ tín dụng (số thẻ, ngày hết hạn và số CVV) để tiếp tục thưởng thức các bộ phim yêu thích mà không bị gián đoạn.',
+    linkText: 'Cập nhật thẻ tín dụng ngay',
+    isPhishing: true,
+    explanation: 'EMAIL PHISHING RÕ RỆT! Netflix chỉ gửi email từ @netflix.com, không bao giờ dùng đuôi tên miền rẻ tiền .xyz. Đường link sẽ dẫn bạn tới form đánh cắp toàn bộ thông tin thẻ tín dụng/Visa/MasterCard.',
+  },
+  {
+    id: 4,
+    sender: 'Shopee Rewards <hotro@shopee.vn>',
+    subject: 'Thông báo: Đơn hàng #SP892348 đã được giao thành công',
+    date: '5 ngày trước',
+    body: 'Đơn hàng của bạn đã được đơn vị vận chuyển giao thành công. Vui lòng kiểm tra hàng và xác nhận "Đã nhận hàng" trên ứng dụng Shopee để nhận Xu tích lũy.',
+    linkText: 'Xem chi tiết đơn hàng trong app',
+    isPhishing: false,
+    explanation: 'EMAIL CHÍNH HÃNG của sàn thương mại điện tử Shopee (đuôi @shopee.vn). Email chỉ cập nhật trạng thái đơn hàng thông thường và hướng dẫn người dùng thao tác trong ứng dụng chính thức.',
+  },
+];
 
 const QuizEmail = () => {
-  const emails = [
-    {
-      id: 1,
-      sender: 'Techcombank Support <security-alert@techcom-security.net>',
-      subject: '🚨 CẢNH BÁO: Tài khoản của bạn sẽ bị tạm ngưng sau 12 giờ',
-      date: 'Hôm nay, 10:45 AM',
-      body: 'Kính gửi Quý khách,\n\nHệ thống ghi nhận một lượt đăng nhập bất thường từ thiết bị lạ tại Singapore. Để đảm bảo an toàn, vui lòng truy cập đường dẫn dưới đây và nhập mã OTP xác thực hủy giao dịch ngay lập tức.\n\nNếu không thực hiện trong vòng 12h, tài khoản của bạn sẽ bị đóng băng vĩnh viễn.',
-      linkText: '👉 Nhấp vào đây để xác minh tài khoản an toàn',
-      isPhishing: true,
-      explanation: 'Đây là EMAIL LỪA ĐẢO NGUY HIỂM! Ngân hàng không bao giờ gửi mail từ đuôi lạ như @techcom-security.net (tên miền chính thức là techcombank.com.vn). Thủ đoạn tạo áp lực thời gian "sau 12 giờ" và đòi hỏi mã OTP là đặc trưng của tội phạm mạng.',
-    },
-    {
-      id: 2,
-      sender: 'Google Security <no-reply@accounts.google.com>',
-      subject: 'Cảnh báo bảo mật: Thiết bị mới vừa đăng nhập',
-      date: 'Hôm qua, 18:20 PM',
-      body: 'Tài khoản Google của bạn vừa được đăng nhập trên Windows (Chrome) tại Hà Nội, Việt Nam.\n\nNếu đây là bạn, bạn không cần làm gì cả. Nếu đây không phải là bạn, hãy kiểm tra hoạt động thiết bị và bảo mật tài khoản trong Cài đặt Google.',
-      linkText: 'Kiểm tra hoạt động thiết bị',
-      isPhishing: false,
-      explanation: 'Đây là EMAIL CHÍNH HÃNG từ Google (@accounts.google.com). Google thông báo sự kiện bảo mật bình thường và không hề yêu cầu bạn cung cấp mật khẩu hay mã OTP qua email.',
-    },
-    {
-      id: 3,
-      sender: 'Netflix Billing <support-payment@netflix-member-renew.xyz>',
-      subject: 'Thanh toán gói thuê bao tháng này không thành công',
-      date: '3 ngày trước',
-      body: 'Gói đăng ký Netflix của bạn đã bị từ chối thanh toán. Vui lòng cập nhật thông tin thẻ tín dụng (số thẻ, ngày hết hạn và số CVV) để tiếp tục thưởng thức các bộ phim yêu thích mà không bị gián đoạn.',
-      linkText: 'Cập nhật thẻ tín dụng ngay',
-      isPhishing: true,
-      explanation: 'EMAIL PHISHING RÕ RỆT! Netflix chỉ gửi email từ @netflix.com, không bao giờ dùng đuôi tên miền rẻ tiền .xyz. Đường link sẽ dẫn bạn tới form đánh cắp toàn bộ thông tin thẻ tín dụng/Visa/MasterCard.',
-    },
-    {
-      id: 4,
-      sender: 'Shopee Rewards <hotro@shopee.vn>',
-      subject: 'Thông báo: Đơn hàng #SP892348 đã được giao thành công',
-      date: '5 ngày trước',
-      body: 'Đơn hàng của bạn đã được đơn vị vận chuyển giao thành công. Vui lòng kiểm tra hàng và xác nhận "Đã nhận hàng" trên ứng dụng Shopee để nhận Xu tích lũy.',
-      linkText: 'Xem chi tiết đơn hàng trong app',
-      isPhishing: false,
-      explanation: 'EMAIL CHÍNH HÃNG của sàn thương mại điện tử Shopee (đuôi @shopee.vn). Email chỉ cập nhật trạng thái đơn hàng thông thường và hướng dẫn người dùng thao tác trong ứng dụng chính thức.',
-    },
-  ];
-
+  const [emails, setEmails] = useState(DEFAULT_EMAILS);
+  const [loading, setLoading] = useState(false);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null); // true = Phishing, false = Legitimate
   const [score, setScore] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  const currentEmail = emails[currentIdx];
+  // Tải câu hỏi Email Phishing động từ Ngân hàng đề thi AICEE
+  const fetchDynamicEmails = async () => {
+    setLoading(true);
+    try {
+      const res = await quizAPI.getRandom({ type: 'email', limit: 6 });
+      if (res.success && Array.isArray(res.data?.questions) && res.data.questions.length > 0) {
+        const mapped = res.data.questions.map((q, idx) => {
+          const emailMatch = q.title.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+          const senderEmail = emailMatch ? emailMatch[0] : 'security-notice@online-verify-alert.com';
+
+          const phishingOption = q.options?.find(o => /lừa đảo|phishing|giả mạo|độc hại/i.test(o.text));
+          const isPhishing = phishingOption ? phishingOption.isCorrect : true;
+
+          return {
+            id: q.id || idx + 1,
+            sender: `Hệ Thống Xác Thực <${senderEmail}>`,
+            subject: q.title,
+            date: 'Hôm nay, 10:30 AM',
+            body: q.explanation || 'Thông báo từ hệ thống: Tài khoản của bạn có hoạt động bất thường. Vui lòng xác thực ngay.',
+            linkText: '👉 Nhấn vào đây để kiểm tra và xử lý an toàn',
+            isPhishing,
+            explanation: q.explanation || 'Hãy chú ý địa chỉ email của người gửi và không bao giờ cung cấp OTP qua đường link email.'
+          };
+        });
+        setEmails(mapped);
+      }
+    } catch (err) {
+      console.warn('Chưa thể tải câu hỏi email động, dùng mẫu:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDynamicEmails();
+  }, []);
+
+  const currentEmail = emails[currentIdx] || DEFAULT_EMAILS[0];
 
   const handleSelect = (choice) => {
     if (selectedAnswer !== null) return;
@@ -73,6 +113,7 @@ const QuizEmail = () => {
   };
 
   const handleRestart = () => {
+    fetchDynamicEmails();
     setCurrentIdx(0);
     setSelectedAnswer(null);
     setScore(0);

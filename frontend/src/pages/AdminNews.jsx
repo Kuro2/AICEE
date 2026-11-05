@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { adminAPI, newsAPI, uploadAPI } from '@/services/api';
 import { 
   Trash2, Edit, Plus, Loader, Eye, X, FileText, 
-  Upload, Image as ImageIcon, CheckCircle2, AlertCircle, RefreshCw 
+  Upload, Image as ImageIcon, CheckCircle2, AlertCircle, RefreshCw, Sparkles 
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -211,6 +211,13 @@ const AdminNews = () => {
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
                 <div className="text-gray-500 text-xs">{item.date}</div>
                 <div className="flex gap-2">
+                  <Link 
+                    to={`/admin/quiz?sourceNewsId=${item.id || item._id}`} 
+                    className="p-2 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 rounded-lg transition-colors"
+                    title="⚡ Tạo Quiz từ bài báo này"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                  </Link>
                   <Link to={`/news/${item.id}`} target="_blank" className="p-2 bg-white/10 hover:bg-white/10 text-gray-400 rounded-lg">
                     <Eye className="w-4 h-4" />
                   </Link>

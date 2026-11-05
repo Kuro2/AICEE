@@ -31,6 +31,7 @@ import AdminResources from '@/pages/AdminResources';
 import AdminNews from '@/pages/AdminNews';
 import AdminReports from '@/pages/AdminReports';
 import AdminChats from '@/pages/AdminChats';
+import AdminQuiz from '@/pages/AdminQuiz';
 
 function App() {
   return (
@@ -70,6 +71,7 @@ function App() {
               <Route path="news" element={<AdminNews />} />
               <Route path="reports" element={<AdminReports />} />
               <Route path="chats" element={<AdminChats />} />
+              <Route path="quiz" element={<AdminQuiz />} />
             </Route>
           </Routes>
         </BrowserRouter>

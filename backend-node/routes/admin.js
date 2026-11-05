@@ -5,6 +5,14 @@ const { UserModel } = require('../models/User');
 const { PaymentModel } = require('../models/Payment');
 const Order = require('../models/Order');
 const ChatMessage = require('../models/ChatMessage');
+const Quiz = require('../models/Quiz');
+const News = require('../models/News');
+const { generateQuizWithAI, exportToExcel, getTemplateBuffer, parseExcelBuffer } = require('../services/quizService');
+const multer = require('multer');
+const memoryUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
 const mongoose = require('mongoose');
 
 // Sử dụng middleware xác thực và kiểm tra quyền admin cho TẤT CẢ các route trong file này
@@ -520,6 +528,293 @@ router.delete('/chats/messages/:id', async (req, res) => {
   } catch (error) {
     console.error('Admin Delete Message Error:', error);
     res.status(500).json({ success: false, message: 'Lỗi khi xóa tin nhắn' });
+  }
+});
+
+/**
+ * ====================================================================
+ *                 QUẢN LÝ NGÂN HÀNG CÂU HỎI QUIZ (ADMIN)
+ * ====================================================================
+ */
+
+/**
+ * @route   GET /api/admin/quiz
+ * @desc    Lấy danh sách câu hỏi trong ngân hàng đề (phân trang, lọc, thống kê)
+ * @access  Private/Admin
+ */
+router.get('/quiz', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    const { type, search, difficulty, status } = req.query;
+
+    const query = {};
+    if (type) query.type = type;
+    if (difficulty) query.difficulty = difficulty;
+    if (status) query.status = status;
+    if (search && search.trim()) {
+      query.$or = [
+        { title: { $regex: search.trim(), $options: 'i' } },
+        { explanation: { $regex: search.trim(), $options: 'i' } }
+      ];
+    }
+
+    const [total, quizzes] = await Promise.all([
+      Quiz.countDocuments(query),
+      Quiz.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit)
+    ]);
+
+    // Thống kê nhanh
+    const [totalAll, typeStats] = await Promise.all([
+      Quiz.countDocuments(),
+      Quiz.aggregate([
+        { $group: { _id: '$type', count: { $sum: 1 } } }
+      ])
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        quizzes,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit)
+        },
+        stats: {
+          total: totalAll,
+          byType: Object.fromEntries(typeStats.map(s => [s._id, s.count]))
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Admin Get Quizzes Error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi khi tải danh sách câu hỏi' });
+  }
+});
+
+/**
+ * @route   POST /api/admin/quiz/generate
+ * @desc    Dùng Gemini AI sinh danh sách câu hỏi từ bài báo hoặc văn bản
+ * @access  Private/Admin
+ */
+router.post('/quiz/generate', async (req, res) => {
+  try {
+    const { newsId, rawContent, count = 2 } = req.body;
+
+    let contentToAnalyze = rawContent;
+    let sourceNewsId = null;
+
+    if (newsId) {
+      const newsItem = await News.findById(newsId);
+      if (!newsItem) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy bài viết nguồn' });
+      }
+      sourceNewsId = newsItem._id;
+      contentToAnalyze = `Tiêu đề: ${newsItem.title}\nTóm tắt: ${newsItem.excerpt || ''}\nNội dung: ${newsItem.content || ''}`;
+    }
+
+    if (!contentToAnalyze || !contentToAnalyze.trim()) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp nội dung bài viết hoặc chọn bài báo' });
+    }
+
+    const questions = await generateQuizWithAI(contentToAnalyze, count);
+
+    // Gắn sourceNewsId nếu có
+    const finalQuestions = questions.map(q => ({
+      ...q,
+      sourceNewsId
+    }));
+
+    res.json({
+      success: true,
+      message: `AI đã sinh thành công ${finalQuestions.length} câu hỏi trắc nghiệm!`,
+      data: {
+        questions: finalQuestions
+      }
+    });
+  } catch (error) {
+    console.error('Admin Generate Quiz Error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Lỗi khi sinh câu hỏi từ AI' });
+  }
+});
+
+/**
+ * @route   POST /api/admin/quiz/bulk-save
+ * @desc    Lưu hàng loạt câu hỏi từ bảng chỉnh sửa trực tiếp vào CSDL
+ * @access  Private/Admin
+ */
+router.post('/quiz/bulk-save', async (req, res) => {
+  try {
+    const { questions } = req.body;
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ success: false, message: 'Danh sách câu hỏi không được rỗng' });
+    }
+
+    // Làm sạch và validate
+    const validQuestions = [];
+    const validationErrors = [];
+
+    questions.forEach((q, idx) => {
+      if (!q.title || !q.title.trim()) {
+        validationErrors.push(`Câu số ${idx + 1}: Thiếu nội dung câu hỏi`);
+        return;
+      }
+      if (!Array.isArray(q.options) || q.options.length < 2) {
+        validationErrors.push(`Câu số ${idx + 1}: Cần tối thiểu 2 phương án lựa chọn`);
+        return;
+      }
+      if (!q.options.some(o => o.isCorrect)) {
+        q.options[0].isCorrect = true; // Đảm bảo luôn có 1 đáp án đúng
+      }
+
+      validQuestions.push({
+        title: q.title.trim(),
+        type: ['url', 'email', 'scenario', 'general'].includes(q.type) ? q.type : 'scenario',
+        options: q.options.map(o => ({ text: String(o.text || '').trim(), isCorrect: Boolean(o.isCorrect) })),
+        explanation: q.explanation ? q.explanation.trim() : '',
+        difficulty: ['easy', 'medium', 'hard'].includes(q.difficulty) ? q.difficulty : 'medium',
+        sourceNewsId: q.sourceNewsId || null,
+        status: q.status || 'published'
+      });
+    });
+
+    if (validQuestions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không có câu hỏi hợp lệ để lưu',
+        errors: validationErrors
+      });
+    }
+
+    const saved = await Quiz.insertMany(validQuestions);
+
+    res.json({
+      success: true,
+      message: `Đã lưu thành công ${saved.length} câu hỏi vào ngân hàng đề!`,
+      data: {
+        savedCount: saved.length,
+        errors: validationErrors
+      }
+    });
+  } catch (error) {
+    console.error('Admin Bulk Save Quiz Error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Lỗi lưu ngân hàng câu hỏi' });
+  }
+});
+
+/**
+ * @route   POST /api/admin/quiz/export-excel
+ * @desc    Xuất danh sách câu hỏi từ bảng ra file Excel (.xlsx) chuẩn Kahoot
+ * @access  Private/Admin
+ */
+router.post('/quiz/export-excel', async (req, res) => {
+  try {
+    let { questions } = req.body;
+
+    // Nếu không truyền questions, lấy tất cả từ DB
+    if (!Array.isArray(questions) || questions.length === 0) {
+      questions = await Quiz.find({ status: 'published' }).sort({ createdAt: -1 }).limit(200);
+    }
+
+    if (!questions || questions.length === 0) {
+      return res.status(400).json({ success: false, message: 'Không có câu hỏi nào để xuất file Excel' });
+    }
+
+    const buffer = exportToExcel(questions);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=AICEE_Quiz_${Date.now()}.xlsx`);
+    res.send(buffer);
+  } catch (error) {
+    console.error('Admin Export Quiz Excel Error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi xuất file Excel' });
+  }
+});
+
+/**
+ * @route   GET /api/admin/quiz/template
+ * @desc    Tải file template Excel mẫu để soạn câu hỏi
+ * @access  Private/Admin
+ */
+router.get('/quiz/template', (req, res) => {
+  try {
+    const buffer = getTemplateBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=AICEE_Quiz_Template.xlsx');
+    res.send(buffer);
+  } catch (error) {
+    console.error('Admin Download Template Error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi tải template Excel' });
+  }
+});
+
+/**
+ * @route   POST /api/admin/quiz/import-excel
+ * @desc    Tải file Excel lên để parse dữ liệu đổ vào bảng chỉnh sửa trực tuyến
+ * @access  Private/Admin
+ */
+router.post('/quiz/import-excel', memoryUpload.single('file'), (req, res) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ success: false, message: 'Vui lòng chọn file Excel (.xlsx, .xls) để tải lên' });
+    }
+
+    const { questions, errors } = parseExcelBuffer(req.file.buffer);
+
+    res.json({
+      success: true,
+      message: `Đã đọc thành công ${questions.length} câu hỏi từ file Excel!`,
+      data: {
+        questions,
+        errors
+      }
+    });
+  } catch (error) {
+    console.error('Admin Import Quiz Excel Error:', error);
+    res.status(400).json({ success: false, message: error.message || 'Lỗi đọc file Excel' });
+  }
+});
+
+/**
+ * @route   PUT /api/admin/quiz/:id
+ * @desc    Cập nhật một câu hỏi cụ thể
+ * @access  Private/Admin
+ */
+router.put('/quiz/:id', async (req, res) => {
+  try {
+    const { title, type, options, explanation, difficulty, status } = req.body;
+    const updated = await Quiz.findByIdAndUpdate(
+      req.params.id,
+      { title, type, options, explanation, difficulty, status, updatedAt: new Date() },
+      { new: true }
+    );
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy câu hỏi' });
+    }
+    res.json({ success: true, message: 'Cập nhật câu hỏi thành công', data: { quiz: updated } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi cập nhật câu hỏi' });
+  }
+});
+
+/**
+ * @route   DELETE /api/admin/quiz/:id
+ * @desc    Xóa một câu hỏi khỏi CSDL
+ * @access  Private/Admin
+ */
+router.delete('/quiz/:id', async (req, res) => {
+  try {
+    const deleted = await Quiz.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy câu hỏi' });
+    }
+    res.json({ success: true, message: 'Đã xóa câu hỏi thành công' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi khi xóa câu hỏi' });
   }
 });
 

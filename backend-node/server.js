@@ -85,6 +85,7 @@ const adminRoutes = require('./routes/admin');
 const subscriptionRoutes = require('./routes/subscription');
 const reportRoutes = require('./routes/reports');
 const paymentRoutes = require('./routes/payment');
+const quizRoutes = require('./routes/quiz');
 
 // ===== MOUNT ROUTES =====
 app.use('/api/auth', authRoutes);
@@ -97,6 +98,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/quiz', quizRoutes);
 
 // ===== ROOT ENDPOINT =====
 app.get('/', (req, res) => {
@@ -212,6 +214,96 @@ if (process.env.MONGODB_URI) {
           ];
           await Resource.insertMany(initialData);
           console.log('✅ Đã nạp dữ liệu mẫu cho danh sách thành công!');
+        }
+
+        // Seed dữ liệu mẫu cho Ngân hàng câu hỏi Quiz nếu chưa có
+        const Quiz = require('./models/Quiz');
+        const quizCount = await Quiz.countDocuments();
+        if (quizCount === 0) {
+          console.log('🔄 Đang khởi tạo dữ liệu mẫu cho Ngân hàng câu hỏi Quiz...');
+          const initialQuizzes = [
+            {
+              title: 'Đường link "https://cskh.evnspc.vn/tra-cuu-tien-dien" trong tin nhắn báo tiền điện là website thật hay giả?',
+              type: 'url',
+              options: [
+                { text: 'Đây là website THẬT chính thống', isCorrect: true },
+                { text: 'Đây là website GIẢ MẠO lừa đảo', isCorrect: false }
+              ],
+              explanation: 'Website THẬT của Tổng công ty Điện lực Miền Nam có tên miền đuôi cấp 1 chính thức .vn (evnspc.vn) và sử dụng giao thức HTTPS bảo mật.',
+              difficulty: 'easy',
+              status: 'published'
+            },
+            {
+              title: 'Tin nhắn gửi kèm link "http://baohiemxahoi-vietnam.online/nhan-tro-cap" yêu cầu đăng nhập nhận tiền an sinh. Đây là thật hay giả?',
+              type: 'url',
+              options: [
+                { text: 'Website chính thống của Bảo hiểm xã hội', isCorrect: false },
+                { text: 'Website giả mạo đánh cắp thông tin cá nhân', isCorrect: true }
+              ],
+              explanation: 'Cổng thông tin BHXH Việt Nam chỉ sử dụng tên miền đuôi .gov.vn (baohiemxahoi.gov.vn), không bao giờ dùng đuôi .online hoặc giao thức http không bảo mật.',
+              difficulty: 'easy',
+              status: 'published'
+            },
+            {
+              title: 'Website "https://vietcombank.com.vn-xacthuc-khachhang.cc" yêu cầu cập nhật sinh trắc học trước 24h nếu không sẽ bị khóa thẻ.',
+              type: 'url',
+              options: [
+                { text: 'Website chính thức của ngân hàng Vietcombank', isCorrect: false },
+                { text: 'Bẫy lừa đảo Phishing tinh vi (tên miền gốc thực chất là .cc)', isCorrect: true }
+              ],
+              explanation: 'Kẻ gian sử dụng kỹ thuật Subdomain để đưa chữ vietcombank vào đầu, nhưng tên miền gốc thực chất là .cc! Vietcombank chỉ dùng vietcombank.com.vn.',
+              difficulty: 'medium',
+              status: 'published'
+            },
+            {
+              title: 'Email từ "Techcombank Support <security-alert@techcom-security.net>" thông báo tài khoản bị khóa và đòi nhập mã OTP.',
+              type: 'email',
+              options: [
+                { text: 'Email chính thức từ ngân hàng Techcombank', isCorrect: false },
+                { text: 'Email lừa đảo nguy hiểm nhằm đánh cắp mã OTP', isCorrect: true }
+              ],
+              explanation: 'Ngân hàng Techcombank không bao giờ gửi email từ đuôi lạ @techcom-security.net và không bao giờ yêu cầu khách hàng cung cấp OTP qua đường link.',
+              difficulty: 'easy',
+              status: 'published'
+            },
+            {
+              title: 'Email từ "Google Security <no-reply@accounts.google.com>" thông báo có thiết bị mới vừa đăng nhập vào tài khoản của bạn.',
+              type: 'email',
+              options: [
+                { text: 'Email chính hãng từ hệ thống bảo mật Google', isCorrect: true },
+                { text: 'Email giả mạo lừa đảo', isCorrect: false }
+              ],
+              explanation: 'Email chính hãng được gửi trực tiếp từ @accounts.google.com để cảnh báo sự kiện đăng nhập thông thường, không đòi hỏi mật khẩu hay OTP.',
+              difficulty: 'medium',
+              status: 'published'
+            },
+            {
+              title: 'Người tự xưng cán bộ điều tra gọi điện yêu cầu chuyển tiền vào "Tài khoản bảo chứng" để chứng minh vô tội.',
+              type: 'scenario',
+              options: [
+                { text: 'Chuyển tiền ngay để chứng minh mình trong sạch', isCorrect: false },
+                { text: 'Tuyệt đối không chuyển tiền, cúp máy và báo cơ quan công an', isCorrect: true },
+                { text: 'Nhờ người thân vay tiền chuyển giúp', isCorrect: false }
+              ],
+              explanation: 'Cơ quan Công an, Viện kiểm sát KHÔNG BAO GIỜ làm việc qua điện thoại và tuyệt đối KHÔNG có "Tài khoản bảo chứng" yêu cầu công dân nạp tiền.',
+              difficulty: 'easy',
+              status: 'published'
+            },
+            {
+              title: 'Tin nhắn mời làm cộng tác viên online xử lý đơn hàng Shopee kiếm hoa hồng 20-30% mỗi ngày.',
+              type: 'scenario',
+              options: [
+                { text: 'Cảnh giác, chặn liên hệ vì đây là bẫy lừa đảo cọc tiền làm nhiệm vụ', isCorrect: true },
+                { text: 'Tham gia ngay vì việc nhẹ lương cao, kiếm tiền dễ dàng', isCorrect: false },
+                { text: 'Chuyển thử vài triệu xem có rút được tiền thật không', isCorrect: false }
+              ],
+              explanation: 'Thủ đoạn lừa đảo việc làm thường trả vài chục ngàn cho các nhiệm vụ đầu, sau đó yêu cầu nạp hàng triệu, hàng chục triệu rồi khóa tài khoản chiếm đoạt tiền.',
+              difficulty: 'medium',
+              status: 'published'
+            }
+          ];
+          await Quiz.insertMany(initialQuizzes);
+          console.log(`✅ Đã nạp thành công ${initialQuizzes.length} câu hỏi mẫu vào Ngân hàng Quiz!`);
         }
         return;
       } catch (err) {
