@@ -23,7 +23,10 @@ import {
   LayoutList,
   Table,
   Copy,
-  Lightbulb
+  Lightbulb,
+  RotateCcw,
+  History,
+  HardDrive
 } from 'lucide-react';
 import { adminAPI, newsAPI, reportAPI } from '@/services/api';
 
@@ -32,9 +35,14 @@ const AdminQuizEditor = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isEditing = Boolean(id);
+  const DRAFT_KEY = isEditing ? `aicee_quiz_draft_${id}` : 'aicee_quiz_draft_new';
 
   // Chế độ xem câu hỏi: 'card' (thẻ dọc rộng rãi, dễ đọc) | 'table' (bảng ngang thu gọn)
   const [viewMode, setViewMode] = useState('card');
+
+  // Trạng thái lưu nháp tạm thời (localStorage)
+  const [draftRestored, setDraftRestored] = useState(null);
+  const [lastSavedTime, setLastSavedTime] = useState(null);
 
   // Form Thông Tin Chủ Đề
   const [topicForm, setTopicForm] = useState({
@@ -76,7 +84,7 @@ const AdminQuizEditor = () => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // 1. Tải dữ liệu ban đầu nếu là chế độ Sửa
+  // 1. Tải dữ liệu ban đầu hoặc Khôi phục bản nháp tạm thời (localStorage)
   useEffect(() => {
     if (isEditing) {
       const fetchTopicDetail = async () => {
@@ -85,28 +93,55 @@ const AdminQuizEditor = () => {
           const res = await adminAPI.getQuizTopic(id);
           if (res.success && res.data?.topic) {
             const t = res.data.topic;
-            setTopicForm({
-              title: t.title || '',
-              slug: t.slug || '',
-              description: t.description || '',
-              category: t.category || 'scenario',
-              difficulty: t.difficulty || 'medium',
-              status: t.status || 'published'
-            });
 
-            const mapped = (t.questions || []).map((q, idx) => ({
-              tempId: idx + 1,
-              title: q.title || '',
-              type: q.type || 'scenario',
-              difficulty: q.difficulty || 'medium',
-              explanation: q.explanation || '',
-              options: (q.options || []).map(o => ({
-                text: o.text || '',
-                isCorrect: o.isCorrect === true
-              }))
-            }));
+            // Kiểm tra xem có bản nháp chưa lưu cho chủ đề này không
+            let hasRestoredDraft = false;
+            try {
+              const draftStr = localStorage.getItem(`aicee_quiz_draft_${id}`);
+              if (draftStr) {
+                const draft = JSON.parse(draftStr);
+                if (draft && Array.isArray(draft.questions) && draft.questions.length > 0) {
+                  setTopicForm(draft.topicForm || {
+                    title: t.title || '',
+                    slug: t.slug || '',
+                    description: t.description || '',
+                    category: t.category || 'scenario',
+                    difficulty: t.difficulty || 'medium',
+                    status: t.status || 'published'
+                  });
+                  setGridQuestions(draft.questions);
+                  setDraftRestored(draft.savedAt || 'trước đó');
+                  hasRestoredDraft = true;
+                }
+              }
+            } catch (e) {
+              console.warn('Lỗi đọc nháp:', e);
+            }
 
-            setGridQuestions(mapped);
+            if (!hasRestoredDraft) {
+              setTopicForm({
+                title: t.title || '',
+                slug: t.slug || '',
+                description: t.description || '',
+                category: t.category || 'scenario',
+                difficulty: t.difficulty || 'medium',
+                status: t.status || 'published'
+              });
+
+              const mapped = (t.questions || []).map((q, idx) => ({
+                tempId: idx + 1,
+                title: q.title || '',
+                type: q.type || 'scenario',
+                difficulty: q.difficulty || 'medium',
+                explanation: q.explanation || '',
+                options: (q.options || []).map(o => ({
+                  text: o.text || '',
+                  isCorrect: o.isCorrect === true
+                }))
+              }));
+
+              setGridQuestions(mapped);
+            }
           } else {
             showToast('Không tìm thấy chủ đề', 'error');
             navigate('/admin/quiz');
@@ -119,10 +154,103 @@ const AdminQuizEditor = () => {
       };
       fetchTopicDetail();
     } else {
-      // Mặc định tạo mới: thêm 1 dòng câu hỏi trắng
+      // Chế độ TẠO MỚI: Kiểm tra xem có bản nháp chưa lưu trong localStorage không
+      try {
+        const draftStr = localStorage.getItem('aicee_quiz_draft_new');
+        if (draftStr) {
+          const draft = JSON.parse(draftStr);
+          if (draft && Array.isArray(draft.questions) && draft.questions.length > 0) {
+            if (draft.topicForm) setTopicForm(draft.topicForm);
+            setGridQuestions(draft.questions);
+            setDraftRestored(draft.savedAt || 'trước đó');
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi đọc nháp tạo mới:', err);
+      }
+
+      // Mặc định tạo mới chưa có nháp: thêm 1 dòng câu hỏi trắng
       setGridQuestions([createEmptyRow(1)]);
     }
   }, [id, isEditing]);
+
+  // 2. Cơ chế TỰ ĐỘNG LƯU NHÁP TẠM THỜI vào localStorage mỗi khi nội dung thay đổi
+  useEffect(() => {
+    if (loadingInitial) return;
+
+    // Chỉ lưu khi có ít nhất 1 câu hỏi có chữ hoặc có tiêu đề chủ đề
+    const hasQuestionContent = gridQuestions.some(q => q.title && q.title.trim().length > 0);
+    const hasTopicContent = topicForm.title && topicForm.title.trim().length > 0;
+
+    if (!hasQuestionContent && !hasTopicContent) return;
+
+    const timer = setTimeout(() => {
+      const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const draftData = {
+        topicForm,
+        questions: gridQuestions,
+        savedAt: nowStr
+      };
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+        setLastSavedTime(nowStr);
+      } catch (err) {
+        console.warn('Lỗi lưu nháp vào localStorage:', err);
+      }
+    }, 600); // Tự động lưu sau 600ms khi người dùng dừng gõ
+
+    return () => clearTimeout(timer);
+  }, [topicForm, gridQuestions, isEditing, loadingInitial, DRAFT_KEY]);
+
+  // Cảnh báo người dùng nếu vô tình F5 hoặc tắt tab khi câu hỏi chưa lưu vào CSDL
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      const hasContent = gridQuestions.some(q => q.title && q.title.trim().length > 0);
+      if (hasContent) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [gridQuestions]);
+
+  // Xóa bản nháp tạm thời và bắt đầu lại sạch sẽ
+  const handleClearDraft = () => {
+    if (window.confirm('Bạn có chắc muốn xóa bản nháp tạm thời này và bắt đầu lại từ đầu không?')) {
+      localStorage.removeItem(DRAFT_KEY);
+      setDraftRestored(null);
+      setLastSavedTime(null);
+      setTopicForm({
+        title: '',
+        slug: '',
+        description: '',
+        category: 'scenario',
+        difficulty: 'medium',
+        status: 'published'
+      });
+      setGridQuestions([createEmptyRow(1)]);
+      showToast('Đã xóa bản nháp tạm thời', 'success');
+    }
+  };
+
+  // Nút chủ động lưu nháp thủ công
+  const handleManualSaveDraft = () => {
+    const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const draftData = {
+      topicForm,
+      questions: gridQuestions,
+      savedAt: nowStr
+    };
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+      setLastSavedTime(nowStr);
+      showToast(`Đã lưu tạm nháp thành công lúc ${nowStr}! (Không lo bị mất khi F5)`);
+    } catch (err) {
+      showToast('Không thể lưu nháp vào trình duyệt', 'error');
+    }
+  };
 
   // 2. Tải danh sách bài báo & báo cáo nguồn để tìm kiếm
   useEffect(() => {
@@ -448,6 +576,15 @@ const AdminQuizEditor = () => {
         showToast('Tạo mới chủ đề trắc nghiệm thành công!');
       }
 
+      // Dọn dẹp bản nháp tạm sau khi lưu thành công vào CSDL
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+        setDraftRestored(null);
+        setLastSavedTime(null);
+      } catch (e) {
+        console.warn('Lỗi dọn nháp:', e);
+      }
+
       // Điều hướng về trang danh sách chủ đề
       setTimeout(() => {
         navigate('/admin/quiz');
@@ -492,24 +629,40 @@ const AdminQuizEditor = () => {
             <ArrowLeft className="w-4 h-4 mr-1.5" />
             Quay lại danh sách Chủ Đề
           </Link>
-          <h1 className="text-2xl font-bold text-white flex items-center space-x-3">
+          <h1 className="text-2xl font-bold text-white flex flex-wrap items-center gap-3">
             <span>{isEditing ? 'Chỉnh Sửa Bộ Đề Chủ Đề' : 'Tạo Chủ Đề Trắc Nghiệm Mới'}</span>
             <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-md bg-slate-800 text-cyan-400">
               {gridQuestions.length} câu trên bảng
             </span>
+            {lastSavedTime && (
+              <span className="text-[11px] font-medium text-emerald-400 flex items-center space-x-1.5 bg-emerald-950/40 border border-emerald-800/60 px-2.5 py-1 rounded-full">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span>Đã tự lưu nháp lúc {lastSavedTime}</span>
+              </span>
+            )}
           </h1>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleManualSaveDraft}
+            className="px-3 py-2 rounded-xl bg-[#111827] hover:bg-slate-800 border border-slate-700 text-xs text-slate-300 hover:text-white flex items-center space-x-1.5 transition-colors"
+            title="Lưu tạm vào bộ nhớ trình duyệt ngay bây giờ để không sợ mất khi F5"
+          >
+            <HardDrive className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Lưu Nháp Tạm</span>
+          </button>
+
           <button
             onClick={handleExportExcel}
-            className="px-3.5 py-2 rounded-xl bg-[#111827] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-white flex items-center space-x-1.5 transition-colors"
+            className="px-3 py-2 rounded-xl bg-[#111827] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-white flex items-center space-x-1.5 transition-colors"
           >
             <Download className="w-3.5 h-3.5 text-cyan-400" />
             <span>Xuất Excel</span>
           </button>
 
-          <label className="px-3.5 py-2 rounded-xl bg-[#111827] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-white flex items-center space-x-1.5 cursor-pointer transition-colors">
+          <label className="px-3 py-2 rounded-xl bg-[#111827] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-white flex items-center space-x-1.5 cursor-pointer transition-colors">
             <Upload className="w-3.5 h-3.5 text-emerald-400" />
             <span>Nạp Excel</span>
             <input
@@ -522,6 +675,35 @@ const AdminQuizEditor = () => {
           </label>
         </div>
       </div>
+
+      {/* Thông báo Khôi phục Bản Nháp Tạm Thời */}
+      {draftRestored && (
+        <div className="bg-[#0c1f2e] border border-cyan-800/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md animate-in fade-in duration-300">
+          <div className="flex items-center space-x-3 text-cyan-200">
+            <div className="p-2 bg-cyan-950 border border-cyan-700/60 rounded-xl text-cyan-400 shrink-0">
+              <RotateCcw className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-white">
+                Đã tự động khôi phục bản nháp tạm thời của bạn (lưu lúc {draftRestored})!
+              </p>
+              <p className="text-[11px] text-cyan-400/80">
+                Gồm {gridQuestions.length} câu hỏi và thông tin chủ đề. Mọi thay đổi bạn nhập sẽ tiếp tục được tự động lưu tạm vào trình duyệt (localStorage), không sợ mất khi F5.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={handleClearDraft}
+              className="px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-xs font-semibold text-rose-300 transition-colors"
+            >
+              Xóa Nháp &amp; Làm Lại Từ Đầu
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── KHỐI 1: THÔNG TIN CHỦ ĐỀ VÀ TÊN MIỀN RIÊNG ── */}
       <div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 space-y-4">
@@ -1221,30 +1403,49 @@ const AdminQuizEditor = () => {
 
         {/* Thanh tác vụ Lưu Chủ đề */}
         <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <Link
-            to="/admin/quiz"
-            className="text-xs font-semibold text-slate-400 hover:text-white"
-          >
-            ← Hủy và quay lại danh sách
-          </Link>
+          <div className="flex items-center space-x-4">
+            <Link
+              to="/admin/quiz"
+              className="text-xs font-semibold text-slate-400 hover:text-white"
+            >
+              ← Hủy và quay lại danh sách
+            </Link>
 
-          <button
-            disabled={isSaving}
-            onClick={handleSaveTopic}
-            className="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-colors shadow-md disabled:opacity-50"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Đang Lưu Vào CSDL...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                <span>LƯU CHỦ ĐỀ NÀY (KÈM {gridQuestions.length} CÂU HỎI)</span>
-              </>
+            <button
+              type="button"
+              onClick={handleManualSaveDraft}
+              className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center space-x-1.5 transition-colors"
+            >
+              <HardDrive className="w-3.5 h-3.5" />
+              <span>Lưu Nháp Tạm Thời</span>
+            </button>
+          </div>
+
+          <div className="flex items-center space-x-3 w-full sm:w-auto">
+            {lastSavedTime && (
+              <span className="text-[11px] text-slate-400 hidden md:inline">
+                Tự động lưu nháp: <span className="text-emerald-400 font-mono">{lastSavedTime}</span>
+              </span>
             )}
-          </button>
+
+            <button
+              disabled={isSaving}
+              onClick={handleSaveTopic}
+              className="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center justify-center space-x-2 transition-colors shadow-md disabled:opacity-50"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Đang Lưu Vào CSDL...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>LƯU CHỦ ĐỀ NÀY (KÈM {gridQuestions.length} CÂU HỎI)</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
