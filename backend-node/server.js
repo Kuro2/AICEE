@@ -305,6 +305,147 @@ if (process.env.MONGODB_URI) {
           await Quiz.insertMany(initialQuizzes);
           console.log(`✅ Đã nạp thành công ${initialQuizzes.length} câu hỏi mẫu vào Ngân hàng Quiz!`);
         }
+
+        // Tự động khởi tạo Chủ đề trắc nghiệm (QuizTopic) nếu chưa có
+        const QuizTopic = require('./models/QuizTopic');
+        const topicCount = await QuizTopic.countDocuments();
+        if (topicCount === 0) {
+          console.log('🔄 Đang khởi tạo các chủ đề trắc nghiệm chuẩn (/quiz/luadao, /quiz/email, /quiz/deepfake)...');
+          const defaultTopics = [
+            {
+              title: 'Cảnh Giác Bẫy Lừa Đảo Trực Tuyến & Việc Làm Online',
+              slug: 'luadao',
+              description: 'Bộ câu hỏi rèn luyện kỹ năng phân tích bẫy lừa đảo việc nhẹ lương cao, mạo danh cơ quan công an và các đường link chiếm đoạt tài sản.',
+              category: 'scenario',
+              difficulty: 'medium',
+              status: 'published',
+              questions: [
+                {
+                  title: 'Người tự xưng là cán bộ điều tra gọi điện yêu cầu bạn chuyển tiền vào "Tài khoản bảo chứng" của cơ quan điều tra để chứng minh vô tội. Bạn nên làm gì?',
+                  type: 'scenario',
+                  options: [
+                    { text: 'Chuyển ngay một khoản nhỏ để chứng minh mình trong sạch', isCorrect: false },
+                    { text: 'Tuyệt đối không chuyển tiền, cúp máy và báo trực tiếp cho cơ quan công an gần nhất', isCorrect: true },
+                    { text: 'Nhờ bạn bè hoặc người thân chuyển tiền giúp vào tài khoản đó', isCorrect: false },
+                    { text: 'Cung cấp mã OTP ngân hàng để cán bộ kiểm tra dòng tiền', isCorrect: false }
+                  ],
+                  explanation: 'Cơ quan Công an, Viện kiểm sát và Tòa án KHÔNG BAO GIỜ làm việc qua điện thoại và tuyệt đối KHÔNG yêu cầu người dân chuyển tiền vào bất kỳ tài khoản bảo chứng nào.',
+                  difficulty: 'easy'
+                },
+                {
+                  title: 'Bạn nhận được lời mời làm cộng tác viên online xử lý đơn hàng Shopee/Lazada hưởng hoa hồng 20-30% mỗi ngày qua Telegram. Dấu hiệu nào cảnh báo lừa đảo?',
+                  type: 'scenario',
+                  options: [
+                    { text: 'Yêu cầu ứng trước tiền túi chuyển vào tài khoản cá nhân để "nạp điểm làm nhiệm vụ"', isCorrect: true },
+                    { text: 'Ứng dụng mua sắm có hợp đồng lao động chính thức', isCorrect: false },
+                    { text: 'Làm việc trực tiếp tại trụ sở văn phòng công ty', isCorrect: false },
+                    { text: 'Yêu cầu phỏng vấn trực tiếp tại văn phòng', isCorrect: false }
+                  ],
+                  explanation: 'Thủ đoạn lừa đảo việc làm thường trả hoa hồng vài chục ngàn cho 1-2 đơn đầu để lấy lòng tin, sau đó ép nạn nhân nạp hàng chục đến hàng trăm triệu rồi chặn liên lạc chiếm đoạt.',
+                  difficulty: 'medium'
+                },
+                {
+                  title: 'Tin nhắn SMS gửi kèm liên kết http://baohiemxahoi-vietnam.online/nhan-tro-cap yêu cầu đăng nhập nhận trợ cấp an sinh. Trang này có an toàn không?',
+                  type: 'url',
+                  options: [
+                    { text: 'An toàn vì có tên "baohiemxahoi" rõ ràng', isCorrect: false },
+                    { text: 'Giả mạo nguy hiểm vì cơ quan nhà nước chỉ dùng tên miền đuôi .gov.vn', isCorrect: true },
+                    { text: 'An toàn nếu trang web có giao diện giống hệt cơ quan nhà nước', isCorrect: false }
+                  ],
+                  explanation: 'Cổng thông tin BHXH Việt Nam chỉ sử dụng tên miền đuôi cấp 1 chính thức .gov.vn (baohiemxahoi.gov.vn), không bao giờ dùng đuôi .online hoặc giao thức http không mã hóa.',
+                  difficulty: 'easy'
+                },
+                {
+                  title: 'Kẻ gian gửi đường link "https://vietcombank.com.vn-xacthuc-khachhang.cc" yêu cầu cập nhật sinh trắc học trước 24h nếu không sẽ bị khóa tài khoản.',
+                  type: 'url',
+                  options: [
+                    { text: 'Trang chính thức của Vietcombank vì có chữ vietcombank.com.vn ở đầu', isCorrect: false },
+                    { text: 'Bẫy Phishing tinh vi: kẻ gian dùng Subdomain để đánh lừa, tên miền gốc thực chất là đuôi .cc!', isCorrect: true },
+                    { text: 'Chỉ cần có biểu tượng ổ khóa HTTPS là an toàn', isCorrect: false }
+                  ],
+                  explanation: 'Đây là thủ thuật ghép tên miền con (subdomain). Tên miền thực sự nằm ngay trước dấu gạch chéo đầu tiên (ở đây là .cc). Vietcombank chỉ dùng trang web chính thức vietcombank.com.vn.',
+                  difficulty: 'hard'
+                }
+              ]
+            },
+            {
+              title: 'Phát Hiện Email Lừa Đảo (Phishing)',
+              slug: 'email',
+              description: 'Rèn luyện khả năng phát hiện email giả danh ngân hàng, dịch vụ trực tuyến đòi mật khẩu và hối thúc chuyển tiền.',
+              category: 'email',
+              difficulty: 'medium',
+              status: 'published',
+              questions: [
+                {
+                  title: 'Email từ "Techcombank Support <security-alert@techcom-security.net>" thông báo tài khoản bị tạm khóa và yêu cầu nhấp link nhập mã OTP. Đây là email gì?',
+                  type: 'email',
+                  options: [
+                    { text: 'Email chính thức từ ngân hàng Techcombank', isCorrect: false },
+                    { text: 'Email Phishing độc hại: đuôi email @techcom-security.net là tên miền giả mạo', isCorrect: true },
+                    { text: 'Email của bộ phận bảo mật quốc tế liên kết với Techcombank', isCorrect: false }
+                  ],
+                  explanation: 'Techcombank chỉ gửi email từ tên miền chính thức @techcombank.com.vn. Ngân hàng không bao giờ yêu cầu khách hàng cung cấp mã OTP qua đường link email.',
+                  difficulty: 'easy'
+                },
+                {
+                  title: 'Email gửi từ "Google Security <no-reply@accounts.google.com>" thông báo phát hiện thiết bị lạ vừa đăng nhập và hướng dẫn kiểm tra trong Cài đặt Google.',
+                  type: 'email',
+                  options: [
+                    { text: 'Email chính hãng từ hệ thống an ninh Google', isCorrect: true },
+                    { text: 'Email giả mạo lừa đảo', isCorrect: false }
+                  ],
+                  explanation: 'Email chính hãng của Google gửi từ @accounts.google.com. Email thông báo hoạt động bình thường, không yêu cầu người dùng cung cấp mật khẩu hay chuyển tiền.',
+                  difficulty: 'medium'
+                },
+                {
+                  title: 'Email từ "Netflix Billing <support@netflix-member-renew.xyz>" thông báo thẻ tín dụng bị từ chối và đòi nhập số CVV để gia hạn. Bạn nên làm gì?',
+                  type: 'email',
+                  options: [
+                    { text: 'Bấm vào link và nhập lại số thẻ tín dụng cùng số CVV', isCorrect: false },
+                    { text: 'Đánh dấu Spam, xóa email và chỉ kiểm tra thông tin thanh toán trực tiếp trên app/web netflix.com', isCorrect: true },
+                    { text: 'Chuyển tiếp email cho bạn bè hỏi ý kiến', isCorrect: false }
+                  ],
+                  explanation: 'Netflix chỉ sử dụng tên miền @netflix.com, không bao giờ dùng đuôi lạ .xyz. Mã CVV là mã bảo mật tối mật, tuyệt đối không nhập trên các trang web lạ.',
+                  difficulty: 'easy'
+                }
+              ]
+            },
+            {
+              title: 'Nhận Diện Cuộc Gọi Video Deepfake & Giọng Nói AI',
+              slug: 'deepfake',
+              description: 'Phát hiện thủ đoạn lừa đảo giả mạo khuôn mặt người thân mượn tiền khẩn cấp qua video call Facebook / Zalo.',
+              category: 'scenario',
+              difficulty: 'hard',
+              status: 'published',
+              questions: [
+                {
+                  title: 'Bạn nhận được cuộc gọi video từ tài khoản Facebook của người thân nhưng hình ảnh bị giật, mờ, khẩu hình miệng không khớp và cúp máy chỉ sau vài giây rồi nhắn tin xin chuyển tiền gấp. Bạn nên làm gì?',
+                  type: 'scenario',
+                  options: [
+                    { text: 'Chuyển tiền ngay vì đã nhìn thấy mặt người thân qua camera', isCorrect: false },
+                    { text: 'Nghi ngờ Deepfake: Gọi điện thoại trực tiếp qua số di động viễn thông để xác minh trước khi chuyển', isCorrect: true },
+                    { text: 'Nhắn tin hỏi số tài khoản và chuyển 50% số tiền yêu cầu', isCorrect: false }
+                  ],
+                  explanation: 'Kẻ gian dùng video cắt ghép hoặc Deepfake giả mạo khuôn mặt và giọng nói, thường viện cớ mạng yếu để cúp máy sớm nhằm tránh bị lộ, sau đó nhắn tin hối thúc chuyển tiền.',
+                  difficulty: 'medium'
+                },
+                {
+                  title: 'Dấu hiệu nào sau đây cho thấy video call có thể đang sử dụng công nghệ giả mạo Deepfake AI?',
+                  type: 'scenario',
+                  options: [
+                    { text: 'Khuôn mặt người gọi chớp mắt bất thường, viền khuôn mặt bị nhòe khi cử động quay đầu', isCorrect: true },
+                    { text: 'Hình ảnh cuộc gọi sắc nét chuẩn 4K mượt mà', isCorrect: false },
+                    { text: 'Người gọi yêu cầu gặp mặt trực tiếp ngoài đời', isCorrect: false }
+                  ],
+                  explanation: 'Các dấu hiệu Deepfake phổ biến: Mắt ít chớp hoặc chớp giật cục, ánh sáng trên mặt không tự nhiên với phông nền, viền cằm/tóc bị nhòe biến dạng khi xoay mặt.',
+                  difficulty: 'hard'
+                }
+              ]
+            }
+          ];
+          await QuizTopic.insertMany(defaultTopics);
+          console.log(`✅ Đã nạp thành công ${defaultTopics.length} chủ đề Quiz chuẩn (/quiz/luadao, /quiz/email, /quiz/deepfake)!`);
+        }
         return;
       } catch (err) {
         console.error(`❌ MongoDB Attempt ${attempt}/${retries} Error:`, err.message);

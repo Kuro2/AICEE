@@ -6,6 +6,7 @@ const { PaymentModel } = require('../models/Payment');
 const Order = require('../models/Order');
 const ChatMessage = require('../models/ChatMessage');
 const Quiz = require('../models/Quiz');
+const QuizTopic = require('../models/QuizTopic');
 const News = require('../models/News');
 const { generateQuizWithAI, exportToExcel, getTemplateBuffer, parseExcelBuffer } = require('../services/quizService');
 const multer = require('multer');
@@ -533,9 +534,208 @@ router.delete('/chats/messages/:id', async (req, res) => {
 
 /**
  * ====================================================================
- *                 QUẢN LÝ NGÂN HÀNG CÂU HỎI QUIZ (ADMIN)
+ *                 QUẢN LÝ CHỦ ĐỀ VÀ NGÂN HÀNG QUIZ (ADMIN)
  * ====================================================================
  */
+
+/**
+ * @route   GET /api/admin/quiz/topics
+ * @desc    Lấy danh sách các chủ đề Quiz (quản lý theo chủ đề)
+ * @access  Private/Admin
+ */
+router.get('/quiz/topics', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    const { category, search, status } = req.query;
+
+    const query = {};
+    if (category) query.category = category;
+    if (status) query.status = status;
+    if (search && search.trim()) {
+      query.$or = [
+        { title: { $regex: search.trim(), $options: 'i' } },
+        { slug: { $regex: search.trim(), $options: 'i' } },
+        { description: { $regex: search.trim(), $options: 'i' } }
+      ];
+    }
+
+    const [total, topics] = await Promise.all([
+      QuizTopic.countDocuments(query),
+      QuizTopic.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit)
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        topics: topics.map(t => ({
+          id: t._id.toString(),
+          title: t.title,
+          slug: t.slug,
+          description: t.description,
+          category: t.category,
+          difficulty: t.difficulty,
+          questionCount: Array.isArray(t.questions) ? t.questions.length : 0,
+          status: t.status,
+          createdAt: t.createdAt,
+          updatedAt: t.updatedAt
+        })),
+        pagination: {
+          total,
+          page,
+          pages: Math.ceil(total / limit) || 1,
+          limit
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Admin Get Quiz Topics Error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi khi tải danh sách chủ đề' });
+  }
+});
+
+/**
+ * @route   GET /api/admin/quiz/topics/:id
+ * @desc    Lấy chi tiết một chủ đề kèm danh sách câu hỏi
+ */
+router.get('/quiz/topics/:id', async (req, res) => {
+  try {
+    const topic = await QuizTopic.findById(req.params.id);
+    if (!topic) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy chủ đề' });
+    }
+    res.json({
+      success: true,
+      data: { 
+        topic: {
+          id: topic._id.toString(),
+          title: topic.title,
+          slug: topic.slug,
+          description: topic.description,
+          category: topic.category,
+          difficulty: topic.difficulty,
+          sourceNewsId: topic.sourceNewsId,
+          questions: topic.questions,
+          status: topic.status,
+          createdAt: topic.createdAt,
+          updatedAt: topic.updatedAt
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi tải chủ đề' });
+  }
+});
+
+/**
+ * @route   POST /api/admin/quiz/topics
+ * @desc    Tạo chủ đề mới kèm danh sách câu hỏi
+ */
+router.post('/quiz/topics', async (req, res) => {
+  try {
+    const { title, slug, description, category, difficulty, sourceNewsId, questions, status } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, message: 'Tên chủ đề không được để trống' });
+    }
+
+    const normalizedSlug = (slug || title)
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/[^a-z0-9_-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    const existing = await QuizTopic.findOne({ slug: normalizedSlug });
+    if (existing) {
+      return res.status(400).json({ success: false, message: `Tên miền chủ đề /quiz/${normalizedSlug} đã tồn tại, vui lòng chọn tên khác!` });
+    }
+
+    const topic = new QuizTopic({
+      title: title.trim(),
+      slug: normalizedSlug,
+      description: description || '',
+      category: category || 'scenario',
+      difficulty: difficulty || 'medium',
+      sourceNewsId: sourceNewsId || null,
+      questions: Array.isArray(questions) ? questions : [],
+      status: status || 'published'
+    });
+
+    await topic.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Tạo chủ đề Quiz thành công',
+      data: { topic }
+    });
+  } catch (error) {
+    console.error('Admin Create Topic Error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Lỗi khi tạo chủ đề' });
+  }
+});
+
+/**
+ * @route   PUT /api/admin/quiz/topics/:id
+ * @desc    Cập nhật thông tin chủ đề và danh sách câu hỏi
+ */
+router.put('/quiz/topics/:id', async (req, res) => {
+  try {
+    const { title, slug, description, category, difficulty, sourceNewsId, questions, status } = req.body;
+
+    const updateData = {};
+    if (title) updateData.title = title.trim();
+    if (description !== undefined) updateData.description = description;
+    if (category) updateData.category = category;
+    if (difficulty) updateData.difficulty = difficulty;
+    if (sourceNewsId !== undefined) updateData.sourceNewsId = sourceNewsId;
+    if (questions) updateData.questions = questions;
+    if (status) updateData.status = status;
+    updateData.updatedAt = new Date();
+
+    if (slug) {
+      const normalizedSlug = slug.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      const existing = await QuizTopic.findOne({ slug: normalizedSlug, _id: { $ne: req.params.id } });
+      if (existing) {
+        return res.status(400).json({ success: false, message: `Tên miền /quiz/${normalizedSlug} đã được sử dụng bởi chủ đề khác` });
+      }
+      updateData.slug = normalizedSlug;
+    }
+
+    const updated = await QuizTopic.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy chủ đề' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Cập nhật chủ đề thành công',
+      data: { topic: updated }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Lỗi cập nhật chủ đề' });
+  }
+});
+
+/**
+ * @route   DELETE /api/admin/quiz/topics/:id
+ * @desc    Xóa một chủ đề Quiz
+ */
+router.delete('/quiz/topics/:id', async (req, res) => {
+  try {
+    const deleted = await QuizTopic.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy chủ đề' });
+    }
+    res.json({ success: true, message: 'Xóa chủ đề Quiz thành công' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi xóa chủ đề' });
+  }
+});
 
 /**
  * @route   GET /api/admin/quiz

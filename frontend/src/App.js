@@ -15,6 +15,8 @@ import HowItWorks from '@/pages/HowItWorks';
 import TermsOfUse from '@/pages/TermsOfUse';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import Profile from '@/pages/Profile';
+import QuizHub from '@/pages/QuizHub';
+import QuizTopicPlayer from '@/pages/QuizTopicPlayer';
 import QuizFake from '@/pages/QuizFake';
 import QuizEmail from '@/pages/QuizEmail';
 import Pricing from '@/pages/Pricing';
@@ -60,10 +62,11 @@ function App() {
             <Route path="/resources/how-it-works" element={<HowItWorks />} />
             <Route path="/resources/terms" element={<TermsOfUse />} />
             <Route path="/resources/privacy" element={<PrivacyPolicy />} />
-            <Route path="/quiz/fake" element={<QuizFake />} />
-            <Route path="/quiz/email" element={<QuizEmail />} />
-            <Route path="/quiz-fake" element={<QuizFake />} />
-            <Route path="/quiz-email" element={<QuizEmail />} />
+            {/* Quiz Topic Routes (Chủ đề Quiz & Tên miền riêng) */}
+            <Route path="/quiz" element={<QuizHub />} />
+            <Route path="/quiz/:slug" element={<QuizTopicPlayer />} />
+            <Route path="/quiz-fake" element={<QuizTopicPlayer />} />
+            <Route path="/quiz-email" element={<QuizTopicPlayer />} />
 
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminLayout />}>

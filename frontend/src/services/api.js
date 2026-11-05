@@ -324,6 +324,22 @@ export const adminAPI = {
   deleteChatMessage: (id) =>
     request('DELETE', `/admin/chats/messages/${id}`),
 
+  // Admin Quiz Topics Management
+  getQuizTopics: (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.append('page', params.page);
+    if (params.limit) searchParams.append('limit', params.limit);
+    if (params.category) searchParams.append('category', params.category);
+    if (params.search) searchParams.append('search', params.search);
+    if (params.status) searchParams.append('status', params.status);
+    const queryString = searchParams.toString();
+    return request('GET', `/admin/quiz/topics${queryString ? `?${queryString}` : ''}`);
+  },
+  getQuizTopic: (id) => request('GET', `/admin/quiz/topics/${id}`),
+  createQuizTopic: (data) => request('POST', '/admin/quiz/topics', data),
+  updateQuizTopic: (id, data) => request('PUT', `/admin/quiz/topics/${id}`, data),
+  deleteQuizTopic: (id) => request('DELETE', `/admin/quiz/topics/${id}`),
+
   // Admin Quiz Management
   getQuizzes: (params = {}) => {
     const searchParams = new URLSearchParams();
@@ -476,6 +492,14 @@ export const reportAPI = {
 
 // ── Public Quiz API ─────────────────────────────────────────
 export const quizAPI = {
+  getTopics: (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.category) searchParams.append('category', params.category);
+    if (params.search) searchParams.append('search', params.search);
+    const queryString = searchParams.toString();
+    return request('GET', `/quiz/topics${queryString ? `?${queryString}` : ''}`);
+  },
+  getTopicBySlug: (slug) => request('GET', `/quiz/topic/${slug}`),
   getRandom: (params = {}) => {
     const searchParams = new URLSearchParams();
     if (params.type) searchParams.append('type', params.type);
