@@ -1,27 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { 
-  HelpCircle, 
-  Sparkles, 
-  FileSpreadsheet, 
-  Download, 
-  Upload, 
-  Plus, 
-  Trash2, 
-  CheckCircle, 
-  AlertCircle, 
-  Loader, 
-  Search, 
-  RefreshCw, 
-  Edit3, 
-  Save, 
-  X, 
-  Check, 
-  FileText, 
-  Link as LinkIcon, 
-  Mail, 
-  ShieldAlert, 
-  BookOpen 
+import {
+  HelpCircle,
+  Sparkles,
+  FileSpreadsheet,
+  Download,
+  Upload,
+  Plus,
+  Trash2,
+  CheckCircle,
+  AlertCircle,
+  Loader,
+  Search,
+  RefreshCw,
+  Edit3,
+  Save,
+  X,
+  Check,
+  FileText,
+  Link as LinkIcon,
+  Mail,
+  ShieldAlert,
+  BookOpen
 } from 'lucide-react';
 import { adminAPI, newsAPI } from '@/services/api';
 
@@ -323,11 +323,10 @@ const AdminQuiz = () => {
     <div className="p-6 max-w-7xl mx-auto space-y-8 font-sans selection:bg-cyan-500/30">
       {/* Toast Alert */}
       {toastMessage && (
-        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-xl border flex items-center space-x-3 transition-all transform animate-in slide-in-from-bottom-5 ${
-          toastMessage.type === 'error'
+        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-xl border flex items-center space-x-3 transition-all transform animate-in slide-in-from-bottom-5 ${toastMessage.type === 'error'
             ? 'bg-red-950/90 border-red-500/50 text-red-200 shadow-red-900/30'
             : 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200 shadow-emerald-900/30'
-        }`}>
+          }`}>
           {toastMessage.type === 'error' ? <AlertCircle className="w-5 h-5 text-red-400 shrink-0" /> : <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />}
           <span className="text-sm font-medium">{toastMessage.text}</span>
         </div>
@@ -405,7 +404,7 @@ const AdminQuiz = () => {
                     {gridQuestions.length} câu trên bảng
                   </span>
                 </h2>
-                <p className="text-xs text-gray-400">Sinh câu hỏi bằng AI hoặc tải Excel lên, sau đó click chuột trực tiếp vào từng ô để chỉnh sửa.</p>
+                <p className="text-xs text-gray-400">Sinh câu hỏi bằng AI hoặc tải Excel lên.</p>
               </div>
             </div>
 
@@ -422,11 +421,11 @@ const AdminQuiz = () => {
               <label className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-xs text-gray-300 hover:text-white flex items-center space-x-1.5 cursor-pointer">
                 <Upload className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Nạp Từ Excel</span>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  accept=".xlsx, .xls" 
-                  className="hidden" 
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".xlsx, .xls"
+                  className="hidden"
                   onChange={handleFileUpload}
                 />
               </label>
@@ -446,11 +445,10 @@ const AdminQuiz = () => {
               <span className="text-xs font-semibold text-gray-400 mr-2 uppercase tracking-wider">Nguồn sinh đề:</span>
               <button
                 onClick={() => setActiveSourceTab('news')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 ${
-                  activeSourceTab === 'news'
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 ${activeSourceTab === 'news'
                     ? 'bg-cyan-500 text-black shadow-md shadow-cyan-500/20'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
+                  }`}
               >
                 <FileText className="w-3.5 h-3.5" />
                 <span>Chọn Bài Báo Có Sẵn</span>
@@ -458,11 +456,10 @@ const AdminQuiz = () => {
 
               <button
                 onClick={() => setActiveSourceTab('text')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 ${
-                  activeSourceTab === 'text'
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 ${activeSourceTab === 'text'
                     ? 'bg-cyan-500 text-black shadow-md shadow-cyan-500/20'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
+                  }`}
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>Nhập Đoạn Văn Bản / Vụ Việc Mới</span>
@@ -817,13 +814,12 @@ const AdminQuiz = () => {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-mono font-bold text-gray-500">#{(currentPage - 1) * 12 + index + 1}</span>
                       {getTypeBadge(quiz.type)}
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                        quiz.difficulty === 'hard'
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${quiz.difficulty === 'hard'
                           ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                           : quiz.difficulty === 'medium'
-                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                          : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                      }`}>
+                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        }`}>
                         {quiz.difficulty === 'hard' ? 'Khó' : quiz.difficulty === 'medium' ? 'Trung bình' : 'Dễ'}
                       </span>
                     </div>
@@ -837,15 +833,13 @@ const AdminQuiz = () => {
                       {quiz.options?.map((opt, oIdx) => (
                         <div
                           key={oIdx}
-                          className={`p-2 rounded-xl text-xs flex items-center space-x-2 border ${
-                            opt.isCorrect
+                          className={`p-2 rounded-xl text-xs flex items-center space-x-2 border ${opt.isCorrect
                               ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 font-semibold'
                               : 'bg-slate-950/60 text-gray-400 border-white/5'
-                          }`}
+                            }`}
                         >
-                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                            opt.isCorrect ? 'bg-emerald-500 text-black' : 'bg-slate-800 text-gray-400'
-                          }`}>
+                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${opt.isCorrect ? 'bg-emerald-500 text-black' : 'bg-slate-800 text-gray-400'
+                            }`}>
                             {String.fromCharCode(65 + oIdx)}
                           </span>
                           <span className="truncate">{opt.text}</span>
