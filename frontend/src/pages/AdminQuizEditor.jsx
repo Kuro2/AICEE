@@ -289,17 +289,24 @@ const AdminQuizEditor = () => {
 
       const res = await adminAPI.generateQuiz(payload);
       if (res.success && Array.isArray(res.data?.questions)) {
-        const newQuestions = res.data.questions.map((q, idx) => ({
-          tempId: Date.now() + idx,
-          title: q.title || '',
-          type: q.type || 'scenario',
-          difficulty: q.difficulty || 'medium',
-          explanation: q.explanation || '',
-          options: (q.options || []).map(o => ({
-            text: o.text || '',
-            isCorrect: o.isCorrect === true
-          }))
-        }));
+        const newQuestions = res.data.questions.map((q, idx) => {
+          const rawOpts = q.options || [];
+          const normalizedOpts = [0, 1, 2, 3].map(i => ({
+            text: rawOpts[i]?.text || '',
+            isCorrect: rawOpts[i]?.isCorrect === true
+          }));
+          if (!normalizedOpts.some(o => o.isCorrect)) {
+            normalizedOpts[0].isCorrect = true;
+          }
+          return {
+            tempId: Date.now() + idx,
+            title: q.title || '',
+            type: q.type || 'scenario',
+            difficulty: q.difficulty || 'medium',
+            explanation: q.explanation || '',
+            options: normalizedOpts
+          };
+        });
 
         setGridQuestions(prev => {
           // Nếu bảng chỉ có 1 câu trắng thì thay thế, ngược lại thêm vào cuối

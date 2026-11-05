@@ -2,7 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const XLSX = require('xlsx');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 
 /**
  * Prompt yêu cầu Gemini tạo câu hỏi trắc nghiệm an ninh mạng dạng JSON chuẩn
@@ -19,27 +19,27 @@ ${content}
 """
 
 Yêu cầu định dạng:
-- Trả về DUY NHẤT một mảng JSON thuần túy (JSON Array). KHÔNG bao gồm văn bản giải thích ngoài JSON.
+- Trả về DUY NHẤT một mảng JSON thuần túy (JSON Array). Tuyệt đối KHÔNG kèm giải thích hay chữ nào khác ngoài JSON.
 - Mỗi phần tử trong mảng phải có cấu trúc chính xác sau:
 [
   {
     "title": "Tên câu hỏi hoặc mô tả tình huống cụ thể (Ví dụ: Bạn nhận được cuộc gọi/tin nhắn/email...)",
-    "type": "url" hoặc "email" hoặc "scenario" hoặc "general",
+    "type": "scenario",
     "options": [
-      { "text": "Nội dung phương án 1", "isCorrect": false },
-      { "text": "Nội dung phương án 2", "isCorrect": true },
-      { "text": "Nội dung phương án 3", "isCorrect": false },
-      { "text": "Nội dung phương án 4", "isCorrect": false }
+      { "text": "Nội dung phương án A", "isCorrect": false },
+      { "text": "Nội dung phương án B", "isCorrect": true },
+      { "text": "Nội dung phương án C", "isCorrect": false },
+      { "text": "Nội dung phương án D", "isCorrect": false }
     ],
     "explanation": "Giải thích chi tiết dấu hiệu nhận biết lừa đảo và cách xử lý an toàn.",
-    "difficulty": "easy" hoặc "medium" hoặc "hard"
+    "difficulty": "medium"
   }
 ]
 
 Quy tắc biên soạn:
-- Câu hỏi bám sát vào chiêu trò thực tế được mô tả trong bài viết (ví dụ: mạo danh công an, giả danh tuyển dụng làm nhiệm vụ, link giả mạo VNeID/ngân hàng...).
+- Câu hỏi bám sát vào chiêu trò thực tế được mô tả trong bài viết (mạo danh, đe dọa, dụ dỗ hoa hồng, link giả mạo...).
 - Phải có chính xác 1 phương án có isCorrect: true, các phương án còn lại là isCorrect: false.
-- Mỗi câu hỏi có từ 2 đến 4 lựa chọn (đối với câu hỏi thật/giả có thể 2 lựa chọn, câu hỏi chọn cách xử lý có thể 4 lựa chọn).
+- Mỗi câu hỏi nên có 4 phương án lựa chọn A, B, C, D rõ ràng, thực tế.
 - Lời giải thích phải rõ ràng, mang tính giáo dục kỹ năng tự bảo vệ bản thân trên không gian mạng.`;
 }
 
@@ -53,118 +53,146 @@ async function generateQuizWithAI(content, count = 2) {
 
   // Fallback nếu không có API Key
   if (!GEMINI_API_KEY) {
-    return getFallbackQuestions(content);
+    return getFallbackQuestions(content, count);
   }
 
-  try {
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({
-      model: GEMINI_MODEL,
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 2048,
-        responseMimeType: "application/json"
+  const prompt = buildQuizPrompt(content, count);
+  const modelsToTry = [
+    process.env.GEMINI_MODEL || 'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-flash-latest'
+  ].filter((v, i, a) => a.indexOf(v) === i);
+
+  let lastError = null;
+
+  for (const modelName of modelsToTry) {
+    try {
+      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({
+        model: modelName
+      });
+
+      const result = await model.generateContent(prompt);
+      let text = result.response.text().trim();
+
+      // Làm sạch markdown code block nếu có
+      text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw new Error('Kết quả AI trả về không phải là mảng câu hỏi JSON');
       }
-    });
 
-    const prompt = buildQuizPrompt(content, count);
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim();
+      // Chuẩn hóa và validate dữ liệu
+      return parsed.map((item, idx) => {
+        const rawOpts = Array.isArray(item.options) ? item.options : [];
+        const options = rawOpts.length >= 2
+          ? rawOpts.map(opt => ({
+              text: String(opt.text || '').trim(),
+              isCorrect: Boolean(opt.isCorrect)
+            }))
+          : [
+              { text: 'Phương án đúng', isCorrect: true },
+              { text: 'Phương án sai', isCorrect: false }
+            ];
 
-    // Làm sạch markdown code block nếu còn sót
-    text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+        // Đảm bảo có ít nhất 1 đáp án đúng
+        if (!options.some(o => o.isCorrect)) {
+          options[0].isCorrect = true;
+        }
 
-    const parsed = JSON.parse(text);
-    if (!Array.isArray(parsed)) {
-      throw new Error('Kết quả AI trả về không phải là mảng câu hỏi JSON');
+        return {
+          title: item.title || `Tình huống an ninh mạng số ${idx + 1}`,
+          type: ['url', 'email', 'scenario', 'general'].includes(item.type) ? item.type : 'scenario',
+          options,
+          explanation: item.explanation || 'Hãy luôn kiểm tra kỹ nguồn gốc và không chia sẻ thông tin nhạy cảm.',
+          difficulty: ['easy', 'medium', 'hard'].includes(item.difficulty) ? item.difficulty : 'medium',
+          status: 'published'
+        };
+      });
+    } catch (err) {
+      console.warn(`[Gemini Quiz] Model ${modelName} gặp lỗi:`, err.message);
+      lastError = err;
     }
-
-    // Chuẩn hóa và validate dữ liệu
-    return parsed.map((item, idx) => {
-      const options = Array.isArray(item.options) && item.options.length >= 2
-        ? item.options.map(opt => ({
-            text: String(opt.text || '').trim(),
-            isCorrect: Boolean(opt.isCorrect)
-          }))
-        : [
-            { text: 'Phương án đúng', isCorrect: true },
-            { text: 'Phương án sai', isCorrect: false }
-          ];
-
-      // Đảm bảo có ít nhất 1 đáp án đúng
-      if (!options.some(o => o.isCorrect)) {
-        options[0].isCorrect = true;
-      }
-
-      return {
-        title: item.title || `Tình huống an ninh mạng số ${idx + 1}`,
-        type: ['url', 'email', 'scenario', 'general'].includes(item.type) ? item.type : 'scenario',
-        options,
-        explanation: item.explanation || 'Hãy luôn kiểm tra kỹ nguồn gốc và không chia sẻ thông tin nhạy cảm.',
-        difficulty: ['easy', 'medium', 'hard'].includes(item.difficulty) ? item.difficulty : 'medium',
-        status: 'published'
-      };
-    });
-  } catch (error) {
-    console.error('Lỗi khi gọi Gemini sinh Quiz:', error.message);
-    return getFallbackQuestions(content);
   }
+
+  console.error('Tất cả các model Gemini đều không phản hồi, sử dụng bộ câu hỏi mẫu dự phòng:', lastError?.message);
+  return getFallbackQuestions(content, count);
 }
 
 /**
- * Bộ câu hỏi mẫu dự phòng khi lỗi kết nối AI
+ * Bộ câu hỏi mẫu dự phòng khi lỗi kết nối AI (Luôn đảm bảo trả về mảng câu hỏi hợp lệ)
  */
-function getFallbackQuestions(content) {
-  const isJobScam = /tuyển dụng|việc làm|nhiệm vụ|hoa hồng|shopee|lazada/i.test(content);
-  const isBankScam = /ngân hàng|chuyển tiền|mã otp|tài khoản|vneid/i.test(content);
+function getFallbackQuestions(content, count = 2) {
+  const isJobScam = /tuyển dụng|việc làm|nhiệm vụ|hoa hồng|shopee|lazada|telegram/i.test(content);
+  const isBankScam = /ngân hàng|chuyển tiền|mã otp|tài khoản|vneid|sinh trắc/i.test(content);
+
+  const fallbackPool = [];
 
   if (isJobScam) {
-    return [
-      {
-        title: 'Tình huống: Tin nhắn mời làm cộng tác viên online xử lý đơn hàng hoa hồng 20-30%',
-        type: 'scenario',
-        options: [
-          { text: 'Tham gia ngay vì việc nhẹ kiếm tiền nhanh', isCorrect: false },
-          { text: 'Cảnh giác, từ chối và chặn tin nhắn vì đây là thủ đoạn lừa đảo cọc tiền làm nhiệm vụ', isCorrect: true },
-          { text: 'Chuyển một khoản tiền nhỏ trước để thử xem có hoàn tiền thật không', isCorrect: false }
-        ],
-        explanation: 'Thủ đoạn lừa đảo tuyển dụng thường hứa hẹn hoa hồng rất cao, ban đầu trả tiền vài đơn nhỏ để tạo lòng tin, sau đó yêu cầu nạp số tiền lớn và chiếm đoạt toàn bộ.',
-        difficulty: 'medium',
-        status: 'published'
-      }
-    ];
+    fallbackPool.push({
+      title: 'Tình huống: Tin nhắn mời làm cộng tác viên online xử lý đơn hàng hoa hồng 20-30% trên Telegram',
+      type: 'scenario',
+      options: [
+        { text: 'Tham gia ngay vì việc nhẹ kiếm tiền nhanh', isCorrect: false },
+        { text: 'Cảnh giác, từ chối và chặn tin nhắn vì đây là thủ đoạn lừa đảo cọc tiền làm nhiệm vụ', isCorrect: true },
+        { text: 'Chuyển một khoản tiền nhỏ trước để thử xem có hoàn tiền thật không', isCorrect: false },
+        { text: 'Chia sẻ cho bạn bè cùng làm', isCorrect: false }
+      ],
+      explanation: 'Thủ đoạn lừa đảo tuyển dụng thường hứa hẹn hoa hồng rất cao, ban đầu trả tiền vài đơn nhỏ để tạo lòng tin, sau đó yêu cầu nạp số tiền lớn và chiếm đoạt toàn bộ.',
+      difficulty: 'medium',
+      status: 'published'
+    });
   }
 
   if (isBankScam) {
-    return [
-      {
-        title: 'Tình huống: Người tự xưng cán bộ yêu cầu cung cấp mã OTP để hỗ trợ cập nhật định danh',
-        type: 'scenario',
-        options: [
-          { text: 'Cung cấp ngay vì người gọi xưng là cơ quan chức năng', isCorrect: false },
-          { text: 'Tuyệt đối không cung cấp OTP và liên hệ trực tiếp cơ quan công an địa phương để xác minh', isCorrect: true },
-          { text: 'Đọc mã OTP nếu người gọi biết chính xác số CCCD của bạn', isCorrect: false }
-        ],
-        explanation: 'Không có bất kỳ cơ quan công an, thuế hay ngân hàng nào yêu cầu công dân cung cấp mã OTP qua điện thoại.',
-        difficulty: 'easy',
-        status: 'published'
-      }
-    ];
+    fallbackPool.push({
+      title: 'Tình huống: Người tự xưng cán bộ yêu cầu cung cấp mã OTP để hỗ trợ cập nhật định danh / sinh trắc học',
+      type: 'scenario',
+      options: [
+        { text: 'Cung cấp ngay vì người gọi xưng là cơ quan chức năng', isCorrect: false },
+        { text: 'Tuyệt đối không cung cấp OTP và liên hệ trực tiếp cơ quan công an địa phương để xác minh', isCorrect: true },
+        { text: 'Đọc mã OTP nếu người gọi biết chính xác số CCCD của bạn', isCorrect: false },
+        { text: 'Chụp màn hình tin nhắn OTP gửi qua Zalo', isCorrect: false }
+      ],
+      explanation: 'Không có bất kỳ cơ quan công an, thuế hay ngân hàng nào yêu cầu công dân cung cấp mã OTP qua điện thoại.',
+      difficulty: 'easy',
+      status: 'published'
+    });
   }
 
-  return [
+  // Luôn bổ sung câu hỏi tình huống chung nếu chưa đủ số lượng
+  const generalQuestions = [
     {
-      title: 'Tình huống an ninh mạng: Nhận được tin nhắn kèm đường link lạ thông báo nhận quà',
+      title: 'Tình huống: Nhận được tin nhắn thông báo tài khoản có biến động hoặc trúng thưởng kèm đường link lạ',
       type: 'url',
       options: [
-        { text: 'Nhấn vào link ngay để xem quà tặng', isCorrect: false },
-        { text: 'Không nhấp vào link, kiểm tra kỹ tên miền và báo cáo tin nhắn rác', isCorrect: true }
+        { text: 'Bấm vào link ngay để kiểm tra thông tin', isCorrect: false },
+        { text: 'Tuyệt đối không bấm vào link, mở app chính thống để kiểm tra', isCorrect: true },
+        { text: 'Chuyển tiếp tin nhắn cho người khác hỏi ý kiến', isCorrect: false },
+        { text: 'Gọi lại trực tiếp vào số điện thoại gửi link', isCorrect: false }
       ],
-      explanation: 'Các đường link lạ thường dẫn đến trang web giả mạo đánh cắp tài khoản hoặc cài mã độc vào thiết bị.',
+      explanation: 'Đường link trong tin nhắn rác thường là bẫy Phishing giả mạo giao diện ngân hàng để đánh cắp tên đăng nhập và mật khẩu.',
       difficulty: 'easy',
+      status: 'published'
+    },
+    {
+      title: 'Dấu hiệu nhận biết rõ ràng nhất của một vụ lừa đảo qua mạng là gì?',
+      type: 'scenario',
+      options: [
+        { text: 'Hối thúc người dùng chuyển tiền hoặc cung cấp OTP trong thời gian gấp gáp', isCorrect: true },
+        { text: 'Giao diện trang web có màu sắc đẹp mắt', isCorrect: false },
+        { text: 'Yêu cầu gặp mặt trực tiếp tại trụ sở công ty', isCorrect: false },
+        { text: 'Gửi hợp đồng có dấu mộc đỏ qua bưu điện', isCorrect: false }
+      ],
+      explanation: 'Kẻ lừa đảo luôn tạo tâm lý hoang mang, sợ hãi hoặc hám lợi để ép nạn nhân hành động vội vàng mà không kịp suy nghĩ hay tham vấn người thân.',
+      difficulty: 'medium',
       status: 'published'
     }
   ];
+
+  const merged = [...fallbackPool, ...generalQuestions];
+  return merged.slice(0, Math.max(count, 1));
 }
 
 /**

@@ -3,7 +3,9 @@ const fs = require('fs');
 const { decodeQRFromImage, analyzeQRPayload } = require('./qrService');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+const GEMINI_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-3.8-flash';
+const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-3.5-flash';
 
 // Hệ thống prompt cho AI chuyên về an ninh mạng
 const SYSTEM_PROMPT = `Bạn là trợ lý AI thông minh của AICEE - nền tảng bảo vệ an ninh mạng hàng đầu Việt Nam.
@@ -158,72 +160,81 @@ function getMockResponse(message) {
   return responses.general.info;
 }
 
-// Gửi tin nhắn tới Gemini AI
+// Gửi tin nhắn tới Gemini AI (Hỗ trợ cấu hình riêng GEMINI_CHAT_MODEL và cơ chế dự phòng)
 async function sendToGemini(message, history = []) {
   if (!GEMINI_API_KEY) {
     return getMockResponse(message);
   }
 
-  try {
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    // Sử dụng đúng tên model và cấu hình systemInstruction đúng chuẩn
-    const model = genAI.getGenerativeModel({ 
-      model: GEMINI_MODEL,
-      systemInstruction: SYSTEM_PROMPT 
-    });
+  const chatModels = [
+    process.env.GEMINI_CHAT_MODEL || 'gemini-3.8-flash',
+    process.env.GEMINI_MODEL || 'gemini-3.5-flash'
+  ].filter((v, i, a) => a.indexOf(v) === i);
 
-    // Lọc lịch sử hợp lệ và đổi role từ 'ai' thành 'model' nếu có
-    const validHistory = history
-      .filter(h => h.content && h.content.trim())
-      .map(h => ({
-        role: h.role === 'model' || h.role === 'ai' ? 'model' : 'user',
-        parts: [{ text: h.content.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{200D}\u{FE0F}]/gu, '') }]
-      }));
+  // Lọc lịch sử hợp lệ và đổi role từ 'ai' thành 'model' nếu có
+  const validHistory = history
+    .filter(h => h.content && h.content.trim())
+    .map(h => ({
+      role: h.role === 'model' || h.role === 'ai' ? 'model' : 'user',
+      parts: [{ text: h.content.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{200D}\u{FE0F}]/gu, '') }]
+    }));
 
-    const chat = model.startChat({
-      history: validHistory,
-      generationConfig: {
-        maxOutputTokens: 1000,
-        temperature: 0.6,
-      }
-    });
+  const cleanMessage = message.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{200D}\u{FE0F}]/gu, '');
 
-    // Loại bỏ emoji khỏi input của user để tránh lỗi
-    const cleanMessage = message.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{200D}\u{FE0F}]/gu, '');
-    
-    // Gửi trực tiếp nội dung người dùng (không gộp SYSTEM_PROMPT vào đây nữa)
-    const result = await chat.sendMessage(cleanMessage);
-    let responseText = result.response.text().trim();
+  let lastError = null;
 
-    // Strip markdown code blocks
-    responseText = responseText
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/i, '')
-      .trim();
-
+  for (const modelName of chatModels) {
     try {
-      if (responseText.startsWith('{')) {
-        const parsed = JSON.parse(responseText);
-        if (parsed.text) responseText = parsed.text;
+      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ 
+        model: modelName,
+        systemInstruction: SYSTEM_PROMPT 
+      });
+
+      const chat = model.startChat({
+        history: validHistory,
+        generationConfig: {
+          maxOutputTokens: 1000,
+          temperature: 0.6,
+        }
+      });
+
+      const result = await chat.sendMessage(cleanMessage);
+      let responseText = result.response.text().trim();
+
+      // Strip markdown code blocks
+      responseText = responseText
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```\s*$/i, '')
+        .trim();
+
+      try {
+        if (responseText.startsWith('{')) {
+          const parsed = JSON.parse(responseText);
+          if (parsed.text) responseText = parsed.text;
+        }
+      } catch (e) {
+        // Bỏ qua lỗi parse JSON
       }
-    } catch (e) {
-      // Bỏ qua lỗi parse JSON
+
+      // Loại bỏ toàn bộ emoji khỏi câu trả lời của AI
+      responseText = responseText.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{200D}\u{FE0F}]/gu, '').replace(/[^\S\r\n]{2,}/g, ' ').trim();
+
+      const lower = responseText.toLowerCase();
+      let status = 'info';
+      if (lower.startsWith('[an toàn]') || lower.includes('[an toàn]') || lower.includes('an toàn')) status = 'safe';
+      else if (lower.startsWith('[nguy hiểm]') || lower.includes('[nguy hiểm]') || lower.includes('lừa đảo') || lower.includes('nguy hiểm')) status = 'danger';
+      else if (lower.startsWith('[cảnh báo]') || lower.includes('[cảnh báo]') || lower.includes('cảnh báo') || lower.includes('đáng ngờ')) status = 'warning';
+
+      return { text: responseText, status, recommendations: [] };
+    } catch (error) {
+      console.warn(`[Gemini Chat] Model ${modelName} gặp sự cố, tự động thử model dự phòng:`, error.message);
+      lastError = error;
     }
-
-    // Loại bỏ toàn bộ emoji khỏi câu trả lời của AI
-    responseText = responseText.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{200D}\u{FE0F}]/gu, '').replace(/[^\S\r\n]{2,}/g, ' ').trim();
-
-    const lower = responseText.toLowerCase();
-    let status = 'info';
-    if (lower.startsWith('[an toàn]') || lower.includes('[an toàn]') || lower.includes('an toàn')) status = 'safe';
-    else if (lower.startsWith('[nguy hiểm]') || lower.includes('[nguy hiểm]') || lower.includes('lừa đảo') || lower.includes('nguy hiểm')) status = 'danger';
-    else if (lower.startsWith('[cảnh báo]') || lower.includes('[cảnh báo]') || lower.includes('cảnh báo') || lower.includes('đáng ngờ')) status = 'warning';
-
-    return { text: responseText, status, recommendations: [] };
-  } catch (error) {
-    console.error('Gemini API error:', error.message);
-    return getMockResponse(message);
   }
+
+  console.error('Gemini Chat API error trên tất cả các model:', lastError?.message);
+  return getMockResponse(message);
 }
 
 // Phân tích file/hình ảnh kết hợp bộ giải mã QR cục bộ và Gemini Vision
@@ -299,7 +310,7 @@ async function analyzeFile(fileName, fileType, fileContent, userMessage = '') {
     try {
       const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
       const model = genAI.getGenerativeModel({
-        model: GEMINI_MODEL,
+        model: GEMINI_VISION_MODEL || GEMINI_MODEL || 'gemini-3.5-flash',
         systemInstruction: SYSTEM_PROMPT
       });
 
