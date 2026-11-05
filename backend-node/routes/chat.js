@@ -54,7 +54,7 @@ router.post('/', optionalAuth, checkScanLimit, async (req, res) => {
     let aiResponse;
     if (files && files.length > 0) {
       const fileResults = await Promise.all(
-        files.map(f => analyzeFile(f.name, f.type, f.content))
+        files.map(f => analyzeFile(f.name, f.type, f.content || f.preview, message))
       );
       aiResponse = {
         text: fileResults.map(r => r.text).join('\n\n---\n\n'),

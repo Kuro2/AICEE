@@ -1,4 +1,4 @@
-const { analyzeWithHeuristic } = require('./aiService');
+// scanService.js - Phân tích an ninh mạng cho URL, Email, Phone
 
 // Danh sách domain đen (blacklist)
 const BLACKLISTED_DOMAINS = [

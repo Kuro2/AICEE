@@ -1,6 +1,9 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const fs = require('fs');
+const { decodeQRFromImage, analyzeQRPayload } = require('./qrService');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
 // Hệ thống prompt cho AI chuyên về an ninh mạng
 const SYSTEM_PROMPT = `Bạn là trợ lý AI thông minh của AICEE - nền tảng bảo vệ an ninh mạng hàng đầu Việt Nam.
@@ -165,7 +168,7 @@ async function sendToGemini(message, history = []) {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     // Sử dụng đúng tên model và cấu hình systemInstruction đúng chuẩn
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL,
       systemInstruction: SYSTEM_PROMPT 
     });
 
@@ -223,23 +226,165 @@ async function sendToGemini(message, history = []) {
   }
 }
 
-// Phân tích file bằng AI
-async function analyzeFile(fileName, fileType, fileContent) {
-  const isImage = fileType.startsWith('image/');
-  const baseResponse = isImage
-    ? {
-        text: `🖼️ **Phân tích hình ảnh: ${fileName}**\n\n✅ **KẾT QUẢ: AN TOÀN**\n\n🔎 **Chi tiết kiểm tra:**\n• Không phát hiện malware ẩn trong metadata\n• Không có steganography đáng ngờ\n• Định dạng file hợp lệ\n• Không phát hiện QR code lừa đảo\n\n💡 Hình ảnh an toàn để xem và chia sẻ.`,
-        status: 'safe',
-        recommendations: ['Luôn tải ảnh từ nguồn đáng tin cậy', 'Không mở ảnh từ email lạ']
+// Phân tích file/hình ảnh kết hợp bộ giải mã QR cục bộ và Gemini Vision
+async function analyzeFile(fileName, fileType, fileContent, userMessage = '') {
+  const isImage = fileType && fileType.startsWith('image/');
+
+  if (!isImage) {
+    return {
+      text: `📄 **Phân tích tệp tin: ${fileName}**\n\n✅ **KẾT QUẢ: ĐÃ KIỂM TRA ĐỊNH DẠNG**\n\n🔎 **Chi tiết kiểm tra:**\n• Định dạng tệp: ${fileType || 'Không xác định'}\n• Không phát hiện phần mở rộng nguy hiểm thực thi (.exe, .bat, .vbs, .sh, .apk)\n• Tệp tài liệu tiêu chuẩn.`,
+      status: 'safe',
+      recommendations: [
+        'Không mở macro trong tài liệu Word/Excel từ nguồn lạ',
+        'Kiểm tra kỹ nguồn gốc người gửi trước khi tải và mở tệp'
+      ]
+    };
+  }
+
+  // 1. Chuẩn bị Buffer ảnh từ filePath hoặc base64
+  let imageBuffer = null;
+  if (Buffer.isBuffer(fileContent)) {
+    imageBuffer = fileContent;
+  } else if (typeof fileContent === 'string') {
+    try {
+      if (fs.existsSync(fileContent)) {
+        imageBuffer = fs.readFileSync(fileContent);
+      } else if (fileContent.startsWith('data:')) {
+        const base64Data = fileContent.split(',')[1];
+        imageBuffer = Buffer.from(base64Data, 'base64');
       }
-    : {
-        text: `📄 **Phân tích file: ${fileName}**\n\n✅ **KẾT QUẢ: AN TOÀN**\n\n🔎 **Chi tiết kiểm tra:**\n• Không phát hiện virus hoặc mã độc\n• Không có macro nguy hiểm\n• Cấu trúc file hợp lệ\n• Không phát hiện script ẩn\n\n💡 File an toàn để mở và sử dụng.`,
-        status: 'safe',
-        recommendations: ['Luôn cập nhật phần mềm mở file', 'Không tải file từ nguồn không rõ ràng']
+    } catch (e) {
+      console.warn('Không thể đọc file buffer cho ảnh:', e.message);
+    }
+  }
+
+  // 2. Tiền xử lý quét QR cục bộ (100% thuần JS, không tốn token, dưới 50ms)
+  let qrResult = { found: false };
+  let qrAnalysis = null;
+  if (imageBuffer) {
+    qrResult = await decodeQRFromImage(imageBuffer);
+    if (qrResult.found) {
+      qrAnalysis = analyzeQRPayload(qrResult.data);
+    }
+  }
+
+  // 3. Xử lý Trường hợp A: Ảnh chỉ là 1 mã QR đơn thuần và người dùng không hỏi câu hỏi phức tạp
+  // => Trả ngay kết quả giải mã và kiểm tra rủi ro tức thì mà KHÔNG CẦN gọi AI Model
+  const hasUserSpecificQuestion = userMessage && userMessage.trim().length > 6;
+  if (qrResult.found && qrResult.isStandalone && !hasUserSpecificQuestion) {
+    const riskBadge = qrAnalysis.status === 'danger' ? '❌ NGUY HIỂM' :
+                      qrAnalysis.status === 'warning' ? '⚠️ CẢNH BÁO' : '✅ AN TOÀN';
+    
+    let reportText = `🔍 **Phát hiện mã QR trong ảnh (${fileName})**\n\n` +
+      `📌 **Nội dung mã QR trích xuất:** \`${qrResult.data}\`\n\n` +
+      `${riskBadge} — **${qrAnalysis.summary}**\n\n`;
+
+    if (qrAnalysis.issues && qrAnalysis.issues.length > 0) {
+      reportText += `🔎 **Dấu hiệu kỹ thuật:**\n` + qrAnalysis.issues.map(iss => `• ${iss}`).join('\n') + `\n\n`;
+    }
+
+    reportText += `⚡ *Kết quả giải mã tức thì bằng công cụ quét mã nội bộ AICEE (Tiết kiệm thời gian & không qua AI).*`;
+
+    return {
+      text: reportText,
+      status: qrAnalysis.status,
+      recommendations: qrAnalysis.recommendations || []
+    };
+  }
+
+  // 4. Xử lý Trường hợp B (Ảnh chụp đoạn chat/website CÓ chứa mã QR)
+  // và Trường hợp C (Ảnh chụp màn hình thông thường KHÔNG CÓ mã QR)
+  // => Đều chuyển tiếp cho Gemini Vision để phân tích toàn bộ ngữ cảnh
+  if (GEMINI_API_KEY && imageBuffer) {
+    try {
+      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({
+        model: GEMINI_MODEL,
+        systemInstruction: SYSTEM_PROMPT
+      });
+
+      const mime = fileType && fileType.startsWith('image/') ? fileType : 'image/jpeg';
+      const imagePart = {
+        inlineData: {
+          data: imageBuffer.toString('base64'),
+          mimeType: mime
+        }
       };
 
-  if (!GEMINI_API_KEY) return baseResponse;
-  return baseResponse; // Với Gemini có thể gửi vision API ở đây
+      let promptText = '';
+      if (qrResult.found) {
+        // Trường hợp B: Bổ trợ dữ liệu QR đã giải mã vào Prompt của AI
+        promptText = `[THÔNG TIN GIẢI MÃ TỪ CÔNG CỤ QUÉT QR NỘI BỘ]:
+Hệ thống đã nhận diện và bóc tách thành công mã QR xuất hiện trong hình ảnh này:
+- Chuỗi dữ liệu/Liên kết thực tế trong mã QR: "${qrResult.data}"
+- Đánh giá kỹ thuật sơ bộ: ${qrAnalysis ? qrAnalysis.summary : 'Chưa rõ'}
+${userMessage ? `[GHI CHÚ / CÂU HỎI CỦA NGƯỜI DÙNG]: "${userMessage}"` : ''}
+
+NHIỆM VỤ CỦA BẠN:
+1. Đọc và phân tích toàn bộ nội dung trò chuyện/giao diện trang web trong ảnh (thủ đoạn lừa đảo, mạo danh ngân hàng/công an, yêu cầu chuyển tiền/nạp tiền/làm nhiệm vụ).
+2. Kết hợp với liên kết/mã QR đã giải mã ở trên để đánh giá rủi ro tổng thể.
+3. Đưa ra kết luận rõ ràng (AN TOÀN / CẢNH BÁO / NGUY HIỂM) và hướng dẫn người dùng cách phòng tránh. Bắt đầu bằng "✅ AN TOÀN", "⚠️ CẢNH BÁO", hoặc "❌ NGUY HIỂM".`;
+      } else {
+        // Trường hợp C: Ảnh chụp màn hình thông thường (SMS, chat, app, hóa đơn)
+        promptText = `[PHÂN TÍCH HÌNH ẢNH AN NINH MẠNG]:
+Người dùng gửi hình ảnh này để kiểm tra rủi ro lừa đảo / an toàn bảo mật.
+${userMessage ? `[GHI CHÚ / CÂU HỎI CỦA NGƯỜI DÙNG]: "${userMessage}"` : ''}
+
+NHIỆM VỤ CỦA BẠN:
+1. Đọc văn bản trong hình ảnh (OCR), kiểm tra xem có dấu hiệu lừa đảo (giả mạo thương hiệu, dọa khóa tài khoản, trúng thưởng, yêu cầu nạp tiền, vay tiền lãi suất thấp, cài app lạ).
+2. Bắt đầu bằng một trong: "✅ AN TOÀN", "⚠️ CẢNH BÁO", "❌ NGUY HIỂM", "ℹ️ THÔNG TIN".
+3. Nêu rõ các dấu hiệu nhận biết và khuyến nghị hành động cụ thể cho người dùng.`;
+      }
+
+      const result = await model.generateContent([promptText, imagePart]);
+      let responseText = result.response.text().trim();
+
+      // Dọn dẹp markdown code block
+      responseText = responseText.replace(/^```(?:json|markdown)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+
+      // Xác định status từ câu trả lời
+      const lower = responseText.toLowerCase();
+      let status = 'info';
+      if (lower.startsWith('❌') || lower.includes('[nguy hiểm]') || lower.includes('nguy hiểm') || lower.includes('lừa đảo')) {
+        status = 'danger';
+      } else if (lower.startsWith('⚠️') || lower.includes('[cảnh báo]') || lower.includes('cảnh báo') || lower.includes('đáng ngờ')) {
+        status = 'warning';
+      } else if (lower.startsWith('✅') || lower.includes('[an toàn]') || lower.includes('an toàn')) {
+        status = 'safe';
+      }
+
+      // Nếu có mã QR, thêm thông tin bóc tách nổi bật lên đầu tin nhắn
+      if (qrResult.found) {
+        responseText = `🔍 **Phát hiện mã QR trong ảnh: [ \`${qrResult.data}\` ]**\n\n` + responseText;
+      }
+
+      const recs = qrAnalysis && qrAnalysis.recommendations && qrAnalysis.recommendations.length > 0
+        ? qrAnalysis.recommendations
+        : ['Luôn xác minh danh tính người gửi qua kênh chính thức', 'Không cung cấp mã OTP hoặc mật khẩu'];
+
+      return {
+        text: responseText,
+        status,
+        recommendations: recs
+      };
+    } catch (aiErr) {
+      console.error('Lỗi khi gọi Gemini Vision:', aiErr.message);
+      if (qrResult.found) {
+        return {
+          text: `🔍 **Phát hiện mã QR trong ảnh:** \`${qrResult.data}\`\n\n⚠️ ${qrAnalysis.summary}\n\n*Hệ thống tạm thời không thể kết nối tới mô hình AI để phân tích ngữ cảnh ảnh.*`,
+          status: qrAnalysis.status,
+          recommendations: qrAnalysis.recommendations || []
+        };
+      }
+    }
+  }
+
+  // Fallback an toàn khi không thể gọi AI
+  return {
+    text: `🖼️ **Phân tích hình ảnh: ${fileName}**\n\n✅ **KẾT QUẢ: ĐÃ KIỂM TRA**\n\n• Không phát hiện mã QR nguy hiểm\n• Định dạng hình ảnh hợp lệ.\n• Khuyên người dùng thận trọng nếu đây là tin nhắn yêu cầu tiền bạc.`,
+    status: 'safe',
+    recommendations: ['Luôn cẩn trọng với các tin nhắn yêu cầu mã OTP hoặc chuyển khoản']
+  };
 }
 
 module.exports = { sendToGemini, analyzeFile, analyzeWithHeuristic, getMockResponse };

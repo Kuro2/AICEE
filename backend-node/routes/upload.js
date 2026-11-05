@@ -112,10 +112,10 @@ router.post('/', optionalAuth, upload.array('files', 5), async (req, res) => {
       }
     } catch (e) {}
 
-    // Phân tích từng file
+    // Phân tích từng file (truyền đường dẫn file.path trên đĩa và lời nhắn của người dùng)
     const analyses = await Promise.all(
       req.files.map(async (file, idx) => {
-        const analysis = await analyzeFile(file.originalname, file.mimetype, null);
+        const analysis = await analyzeFile(file.originalname, file.mimetype, file.path, userCustomText);
 
         // Lưu preview: ưu tiên dataUrl từ client, hoặc base64 tự sinh, hoặc static url
         let preview = clientPreviews[idx] || `/uploads/${file.filename}`;
