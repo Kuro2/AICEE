@@ -3,6 +3,7 @@ const XLSX = require('xlsx');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+const GEMINI_QUIZ_MODEL = process.env.GEMINI_QUIZ_MODEL || 'gemini-3.6-flash';
 
 /**
  * Prompt yêu cầu Gemini tạo câu hỏi trắc nghiệm an ninh mạng dạng JSON chuẩn
@@ -58,8 +59,8 @@ async function generateQuizWithAI(content, count = 2) {
 
   const prompt = buildQuizPrompt(content, count);
   const modelsToTry = [
-    process.env.GEMINI_MODEL || 'gemini-3.5-flash',
-    'gemini-3.5-flash-lite',
+    process.env.GEMINI_QUIZ_MODEL || 'gemini-3.6-flash',
+    'gemini-3.5-flash',
     'gemini-flash-latest'
   ].filter((v, i, a) => a.indexOf(v) === i);
 
