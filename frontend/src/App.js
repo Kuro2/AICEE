@@ -62,6 +62,8 @@ function App() {
             <Route path="/resources/privacy" element={<PrivacyPolicy />} />
             <Route path="/quiz/fake" element={<QuizFake />} />
             <Route path="/quiz/email" element={<QuizEmail />} />
+            <Route path="/quiz-fake" element={<QuizFake />} />
+            <Route path="/quiz-email" element={<QuizEmail />} />
 
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminLayout />}>
