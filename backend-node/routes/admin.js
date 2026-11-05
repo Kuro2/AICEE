@@ -8,6 +8,7 @@ const ChatMessage = require('../models/ChatMessage');
 const Quiz = require('../models/Quiz');
 const QuizTopic = require('../models/QuizTopic');
 const News = require('../models/News');
+const Report = require('../models/Report');
 const { generateQuizWithAI, exportToExcel, getTemplateBuffer, parseExcelBuffer } = require('../services/quizService');
 const multer = require('multer');
 const memoryUpload = multer({
@@ -802,7 +803,7 @@ router.get('/quiz', async (req, res) => {
  */
 router.post('/quiz/generate', async (req, res) => {
   try {
-    const { newsId, rawContent, count = 2 } = req.body;
+    const { newsId, reportId, rawContent, count = 3 } = req.body;
 
     let contentToAnalyze = rawContent;
     let sourceNewsId = null;
@@ -814,13 +815,21 @@ router.post('/quiz/generate', async (req, res) => {
       }
       sourceNewsId = newsItem._id;
       contentToAnalyze = `Tiêu đề: ${newsItem.title}\nTóm tắt: ${newsItem.excerpt || ''}\nNội dung: ${newsItem.content || ''}`;
+    } else if (reportId) {
+      const reportItem = await Report.findById(reportId);
+      if (!reportItem) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy báo cáo nguồn' });
+      }
+      contentToAnalyze = `Vụ việc lừa đảo: ${reportItem.title || reportItem.target}\nĐối tượng/Hình thức: ${reportItem.target} (${reportItem.type})\nNội dung sự việc: ${reportItem.description}`;
     }
 
     if (!contentToAnalyze || !contentToAnalyze.trim()) {
-      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp nội dung bài viết hoặc chọn bài báo' });
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp nội dung bài viết hoặc chọn bài báo / báo cáo' });
     }
 
-    const questions = await generateQuizWithAI(contentToAnalyze, count);
+    // Đặt giới hạn an toàn cho số lượng câu hỏi sinh bằng AI: Tối thiểu 1 câu, tối đa 10 câu
+    const safeCount = Math.min(Math.max(parseInt(count, 10) || 3, 1), 10);
+    const questions = await generateQuizWithAI(contentToAnalyze, safeCount);
 
     // Gắn sourceNewsId nếu có
     const finalQuestions = questions.map(q => ({

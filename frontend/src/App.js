@@ -1,6 +1,6 @@
 import React from 'react';
 import '@/App.css';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import Home from '@/pages/Home';
 import Login from '@/pages/Login';
@@ -34,6 +34,7 @@ import AdminNews from '@/pages/AdminNews';
 import AdminReports from '@/pages/AdminReports';
 import AdminChats from '@/pages/AdminChats';
 import AdminQuiz from '@/pages/AdminQuiz';
+import AdminQuizEditor from '@/pages/AdminQuizEditor';
 
 function App() {
   return (
@@ -65,8 +66,8 @@ function App() {
             {/* Quiz Topic Routes (Chủ đề Quiz & Tên miền riêng) */}
             <Route path="/quiz" element={<QuizHub />} />
             <Route path="/quiz/:slug" element={<QuizTopicPlayer />} />
-            <Route path="/quiz-fake" element={<QuizTopicPlayer />} />
-            <Route path="/quiz-email" element={<QuizTopicPlayer />} />
+            <Route path="/quiz-fake" element={<Navigate to="/quiz/luadao" replace />} />
+            <Route path="/quiz-email" element={<Navigate to="/quiz/email" replace />} />
 
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminLayout />}>
@@ -77,6 +78,8 @@ function App() {
               <Route path="reports" element={<AdminReports />} />
               <Route path="chats" element={<AdminChats />} />
               <Route path="quiz" element={<AdminQuiz />} />
+              <Route path="quiz/create" element={<AdminQuizEditor />} />
+              <Route path="quiz/edit/:id" element={<AdminQuizEditor />} />
             </Route>
           </Routes>
         </BrowserRouter>

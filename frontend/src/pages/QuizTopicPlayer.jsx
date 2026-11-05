@@ -39,8 +39,11 @@ const QuizTopicPlayer = () => {
       setLoading(true);
       setError(null);
       try {
-        // Hỗ trợ alias: nếu slug là fake hoặc email từ router cũ
-        const querySlug = slug === 'fake' ? 'luadao' : slug;
+        // Hỗ trợ alias: nếu slug là fake hoặc email từ router cũ, hoặc fallback
+        let querySlug = slug;
+        if (!querySlug || querySlug === 'fake' || querySlug === 'undefined') {
+          querySlug = 'luadao';
+        }
         const res = await quizAPI.getTopicBySlug(querySlug);
         if (isMounted) {
           if (res.success && res.data) {
@@ -360,3 +363,4 @@ const QuizTopicPlayer = () => {
 };
 
 export default QuizTopicPlayer;
+

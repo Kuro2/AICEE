@@ -212,7 +212,7 @@ const AdminNews = () => {
                 <div className="text-gray-500 text-xs">{item.date}</div>
                 <div className="flex gap-2">
                   <Link 
-                    to={`/admin/quiz?sourceNewsId=${item.id || item._id}`} 
+                    to={`/admin/quiz/create?sourceNewsId=${item.id || item._id}`} 
                     className="p-2 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 rounded-lg transition-colors"
                     title="⚡ Tạo Quiz từ bài báo này"
                   >
