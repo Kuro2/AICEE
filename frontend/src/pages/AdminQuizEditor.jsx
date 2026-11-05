@@ -18,7 +18,12 @@ import {
   Edit3,
   ExternalLink,
   Minus,
-  Check
+  Check,
+  ListChecks,
+  LayoutList,
+  Table,
+  Copy,
+  Lightbulb
 } from 'lucide-react';
 import { adminAPI, newsAPI, reportAPI } from '@/services/api';
 
@@ -27,6 +32,9 @@ const AdminQuizEditor = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isEditing = Boolean(id);
+
+  // Chế độ xem câu hỏi: 'card' (thẻ dọc rộng rãi, dễ đọc) | 'table' (bảng ngang thu gọn)
+  const [viewMode, setViewMode] = useState('card');
 
   // Form Thông Tin Chủ Đề
   const [topicForm, setTopicForm] = useState({
@@ -176,6 +184,22 @@ const AdminQuizEditor = () => {
 
   const handleRemoveRow = (idx) => {
     setGridQuestions(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleDuplicateRow = (idx) => {
+    setGridQuestions(prev => {
+      const target = prev[idx];
+      const clone = {
+        ...target,
+        tempId: Date.now(),
+        title: target.title ? `${target.title} (Bản sao)` : '',
+        options: (target.options || []).map(o => ({ ...o }))
+      };
+      const next = [...prev];
+      next.splice(idx + 1, 0, clone);
+      return next;
+    });
+    showToast('Đã nhân bản câu hỏi');
   };
 
   const handleQuestionChange = (idx, field, value) => {
@@ -854,122 +878,346 @@ const AdminQuizEditor = () => {
         </div>
       </div>
 
-      {/* ── KHỐI 3: BẢNG TÍNH SPREADSHEET CÂU HỎI (FLAT DESIGN) ── */}
-      <div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-cyan-400 flex items-center space-x-2">
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>3. Bảng Tính Chỉnh Sửa Câu Hỏi & Đáp Án</span>
-          </h2>
+      {/* ── KHỐI 3: DANH SÁCH CHI TIẾT CÂU HỎI & ĐÁP ÁN (DẠNG THẺ DỌC MỞ RỘNG) ── */}
+      <div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wider text-cyan-400 flex items-center space-x-2">
+              <ListChecks className="w-4 h-4 text-cyan-400" />
+              <span>3. Tinh Chỉnh Chi Tiết Từng Câu Hỏi &amp; Đáp Án</span>
+              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-cyan-300">
+                {gridQuestions.length} câu
+              </span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Mỗi câu hỏi được hiển thị theo từng khối dọc rộng rãi giúp bạn dễ dàng đọc toàn bộ tình huống và chỉnh sửa.
+            </p>
+          </div>
 
-          <button
-            onClick={handleAddRow}
-            className="px-3.5 py-1.5 bg-[#0f172a] hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white rounded-xl flex items-center space-x-1.5 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Thêm Dòng Trống</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            {/* Bộ chuyển đổi chế độ xem */}
+            <div className="flex items-center bg-[#0f172a] p-1 rounded-xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setViewMode('card')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors ${
+                  viewMode === 'card'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Dạng khối thẻ rộng rãi, dễ đọc và chỉnh sửa"
+              >
+                <LayoutList className="w-3.5 h-3.5" />
+                <span>Thẻ Dọc (Chi Tiết)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors ${
+                  viewMode === 'table'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Dạng bảng tính Excel thu gọn"
+              >
+                <Table className="w-3.5 h-3.5" />
+                <span>Bảng Ngang</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAddRow}
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 border border-cyan-500 text-xs font-bold text-white rounded-xl flex items-center space-x-1.5 transition-colors shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Thêm Câu Hỏi</span>
+            </button>
+          </div>
         </div>
 
-        <div className="border border-slate-800 rounded-xl overflow-hidden bg-[#0a0f1d]">
-          <div className="overflow-x-auto max-h-[500px]">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-[#1e293b] text-slate-300 font-bold border-b border-slate-700 uppercase tracking-wider sticky top-0 z-10">
-                  <th className="p-3 w-10 text-center">#</th>
-                  <th className="p-3 w-72">Tình Huống / Câu Hỏi</th>
-                  <th className="p-3 w-32">Thể Loại</th>
-                  <th className="p-3 min-w-[180px]">Phương Án A</th>
-                  <th className="p-3 min-w-[180px]">Phương Án B</th>
-                  <th className="p-3 min-w-[180px]">Phương Án C</th>
-                  <th className="p-3 min-w-[180px]">Phương Án D</th>
-                  <th className="p-3 w-64">Giải Thích Chi Tiết</th>
-                  <th className="p-3 w-12 text-center">Xóa</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {gridQuestions.map((row, qIdx) => (
-                  <tr key={row.tempId || qIdx} className="hover:bg-slate-900/60 transition-colors">
-                    <td className="p-2.5 text-center font-mono font-bold text-slate-500">
+        {/* 1. CHẾ ĐỘ THẺ DỌC MỞ RỘNG (MẶC ĐỊNH - DỄ ĐỌC & SỬA NHẤT) */}
+        {viewMode === 'card' ? (
+          <div className="space-y-6">
+            {gridQuestions.map((row, qIdx) => (
+              <div
+                key={row.tempId || qIdx}
+                className="bg-[#0b1120] border border-slate-800 hover:border-slate-700/80 rounded-2xl p-5 sm:p-6 space-y-5 transition-all shadow-lg"
+              >
+                {/* Header Thẻ: Số thứ tự + Thể loại + Độ khó + Nút Xóa/Nhân bản */}
+                <div className="flex flex-wrap items-center justify-between pb-3.5 border-b border-slate-800/80 gap-3">
+                  <div className="flex items-center space-x-3">
+                    <span className="w-8 h-8 rounded-xl bg-cyan-950 border border-cyan-700/60 text-cyan-400 font-mono font-bold flex items-center justify-center text-sm shadow-sm">
                       {qIdx + 1}
-                    </td>
+                    </span>
+                    <span className="text-sm font-bold text-white">
+                      Câu Hỏi #{qIdx + 1}
+                    </span>
+                  </div>
 
-                    <td className="p-2">
-                      <textarea
-                        rows={2}
-                        value={row.title}
-                        onChange={(e) => handleQuestionChange(qIdx, 'title', e.target.value)}
-                        placeholder="Nhập tình huống / câu hỏi..."
-                        className="w-full p-2 bg-[#111827] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-500 resize-none"
-                      />
-                    </td>
-
-                    <td className="p-2">
+                  <div className="flex items-center space-x-3">
+                    {/* Thể loại */}
+                    <div className="flex items-center space-x-1.5 text-xs text-slate-400">
+                      <span>Loại:</span>
                       <select
                         value={row.type}
                         onChange={(e) => handleQuestionChange(qIdx, 'type', e.target.value)}
-                        className="w-full p-2 bg-[#111827] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-500"
+                        className="px-2.5 py-1.5 bg-[#111827] border border-slate-700 rounded-lg text-xs font-medium text-white focus:outline-none focus:border-cyan-500"
                       >
-                        <option value="scenario">Tình huống</option>
-                        <option value="email">Email</option>
-                        <option value="url">URL</option>
-                        <option value="general">Chung</option>
+                        <option value="scenario">Tình huống thực tế</option>
+                        <option value="email">Email Phishing</option>
+                        <option value="url">Website / URL</option>
+                        <option value="general">Kiến thức chung</option>
                       </select>
-                    </td>
+                    </div>
 
+                    {/* Độ khó */}
+                    <div className="flex items-center space-x-1.5 text-xs text-slate-400">
+                      <span>Độ khó:</span>
+                      <select
+                        value={row.difficulty || 'medium'}
+                        onChange={(e) => handleQuestionChange(qIdx, 'difficulty', e.target.value)}
+                        className="px-2.5 py-1.5 bg-[#111827] border border-slate-700 rounded-lg text-xs font-medium text-white focus:outline-none focus:border-cyan-500"
+                      >
+                        <option value="easy">Cơ bản</option>
+                        <option value="medium">Trung bình</option>
+                        <option value="hard">Nâng cao</option>
+                      </select>
+                    </div>
+
+                    {/* Nhân bản câu hỏi */}
+                    <button
+                      type="button"
+                      onClick={() => handleDuplicateRow(qIdx)}
+                      className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 rounded-lg transition-colors"
+                      title="Nhân bản câu hỏi này"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+
+                    {/* Xóa câu hỏi */}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRow(qIdx)}
+                      className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors"
+                      title="Xóa câu hỏi này"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 1. TÌNH HUỐNG / NỘI DUNG CÂU HỎI (Rộng toàn màn hình, rows=3-4) */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center justify-between">
+                    <span>Nội Dung Tình Huống / Câu Hỏi</span>
+                    <span className="text-[11px] font-normal text-slate-500 lowercase">
+                      {row.title?.length || 0} ký tự
+                    </span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={row.title}
+                    onChange={(e) => handleQuestionChange(qIdx, 'title', e.target.value)}
+                    placeholder="Nhập tình huống hoặc câu hỏi đầy đủ (ví dụ: Bạn nhận được cuộc gọi từ số lạ tự xưng là cán bộ công an yêu cầu chuyển tiền vào tài khoản bảo chứng để kiểm tra...)"
+                    className="w-full p-3.5 bg-[#111827] border border-slate-700/80 rounded-xl text-sm leading-relaxed text-white focus:outline-none focus:border-cyan-500 placeholder-slate-500 resize-y"
+                  />
+                </div>
+
+                {/* 2. CÁC PHƯƠNG ÁN LỰA CHỌN (Lưới 2 cột hoặc 1 cột thoáng đãng) */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                      Các Phương Án Lựa Chọn &amp; Đáp Án Đúng:
+                    </label>
+                    <span className="text-[11px] text-cyan-400">
+                      (Bấm vào nút tròn để chọn phương án làm đáp án đúng)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                     {[0, 1, 2, 3].map((optIdx) => {
                       const opt = row.options?.[optIdx] || { text: '', isCorrect: false };
+                      const optLetter = String.fromCharCode(65 + optIdx);
                       return (
-                        <td key={optIdx} className="p-2">
-                          <div className={`p-1.5 rounded-lg border flex items-center space-x-2 ${
+                        <div
+                          key={optIdx}
+                          onClick={() => handleSetCorrectOption(qIdx, optIdx)}
+                          className={`p-3.5 rounded-xl border transition-all flex items-start space-x-3 cursor-pointer ${
                             opt.isCorrect
-                              ? 'bg-emerald-950/40 border-emerald-500'
-                              : 'bg-[#111827] border-slate-800'
-                          }`}>
+                              ? 'bg-[#064e3b]/30 border-emerald-500 text-white shadow-sm ring-1 ring-emerald-500/30'
+                              : 'bg-[#111827] border-slate-700/80 hover:border-slate-600 text-slate-300'
+                          }`}
+                        >
+                          <div className="pt-0.5 shrink-0 flex items-center space-x-2">
                             <input
                               type="radio"
                               name={`correct-${qIdx}`}
                               checked={opt.isCorrect}
                               onChange={() => handleSetCorrectOption(qIdx, optIdx)}
-                              className="w-3.5 h-3.5 accent-emerald-500 cursor-pointer shrink-0"
-                              title="Chọn làm đáp án đúng"
+                              className="w-4 h-4 accent-emerald-500 cursor-pointer"
+                              title="Đặt làm đáp án đúng"
                             />
-                            <input
-                              type="text"
+                            <span className={`w-6 h-6 rounded-lg font-mono font-bold text-xs flex items-center justify-center ${
+                              opt.isCorrect
+                                ? 'bg-emerald-500 text-black font-extrabold'
+                                : 'bg-slate-800 text-slate-300'
+                            }`}>
+                              {optLetter}
+                            </span>
+                          </div>
+
+                          <div className="flex-1" onClick={(e) => e.stopPropagation()}>
+                            <textarea
+                              rows={2}
                               value={opt.text}
                               onChange={(e) => handleOptionTextChange(qIdx, optIdx, e.target.value)}
-                              placeholder={`Phương án ${String.fromCharCode(65 + optIdx)}...`}
-                              className="w-full bg-transparent border-none text-xs text-white focus:outline-none"
+                              placeholder={`Nội dung phương án ${optLetter}...`}
+                              className="w-full bg-transparent border-none text-xs sm:text-sm text-white focus:outline-none resize-none leading-relaxed placeholder-slate-600"
                             />
                           </div>
-                        </td>
+
+                          {opt.isCorrect && (
+                            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                              Đáp án đúng
+                            </span>
+                          )}
+                        </div>
                       );
                     })}
+                  </div>
+                </div>
 
-                    <td className="p-2">
-                      <textarea
-                        rows={2}
-                        value={row.explanation}
-                        onChange={(e) => handleQuestionChange(qIdx, 'explanation', e.target.value)}
-                        placeholder="Vì sao đáp án đúng, dấu hiệu cảnh báo..."
-                        className="w-full p-2 bg-[#111827] border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-cyan-500 resize-none"
-                      />
-                    </td>
+                {/* 3. LỜI GIẢI THÍCH CHI TIẾT (Full width, thoáng đãng) */}
+                <div className="space-y-2 pt-1 border-t border-slate-800/60">
+                  <label className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center space-x-1.5">
+                    <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Giải Thích Chi Tiết &amp; Lời Khuyên An Ninh Mạng:</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={row.explanation}
+                    onChange={(e) => handleQuestionChange(qIdx, 'explanation', e.target.value)}
+                    placeholder="Giải thích vì sao phương án trên là đúng, chỉ rõ dấu hiệu lừa đảo và cách phòng tránh để học viên hiểu sâu..."
+                    className="w-full p-3 bg-[#111827] border border-slate-700/80 rounded-xl text-xs sm:text-sm leading-relaxed text-slate-300 focus:outline-none focus:border-cyan-500 placeholder-slate-600 resize-y"
+                  />
+                </div>
+              </div>
+            ))}
 
-                    <td className="p-2 text-center">
-                      <button
-                        onClick={() => handleRemoveRow(qIdx)}
-                        className="p-1.5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {/* Nút to thêm câu hỏi ở cuối danh sách thẻ */}
+            <button
+              type="button"
+              onClick={handleAddRow}
+              className="w-full py-4 rounded-2xl border-2 border-dashed border-slate-700 hover:border-cyan-500/60 hover:bg-slate-900/40 text-slate-400 hover:text-cyan-400 font-bold text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Thêm Câu Hỏi Mới</span>
+            </button>
           </div>
-        </div>
+        ) : (
+          /* 2. CHẾ ĐỘ BẢNG NGANG THU GỌN (CHO AI MUỐN XEM TỔNG QUAN) */
+          <div className="border border-slate-800 rounded-xl overflow-hidden bg-[#0a0f1d]">
+            <div className="overflow-x-auto max-h-[600px]">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-[#1e293b] text-slate-300 font-bold border-b border-slate-700 uppercase tracking-wider sticky top-0 z-10">
+                    <th className="p-3 w-10 text-center">#</th>
+                    <th className="p-3 w-72">Tình Huống / Câu Hỏi</th>
+                    <th className="p-3 w-32">Thể Loại</th>
+                    <th className="p-3 min-w-[180px]">Phương Án A</th>
+                    <th className="p-3 min-w-[180px]">Phương Án B</th>
+                    <th className="p-3 min-w-[180px]">Phương Án C</th>
+                    <th className="p-3 min-w-[180px]">Phương Án D</th>
+                    <th className="p-3 w-64">Giải Thích Chi Tiết</th>
+                    <th className="p-3 w-12 text-center">Xóa</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/80">
+                  {gridQuestions.map((row, qIdx) => (
+                    <tr key={row.tempId || qIdx} className="hover:bg-slate-900/60 transition-colors">
+                      <td className="p-2.5 text-center font-mono font-bold text-slate-500">
+                        {qIdx + 1}
+                      </td>
+
+                      <td className="p-2">
+                        <textarea
+                          rows={2}
+                          value={row.title}
+                          onChange={(e) => handleQuestionChange(qIdx, 'title', e.target.value)}
+                          placeholder="Nhập tình huống / câu hỏi..."
+                          className="w-full p-2 bg-[#111827] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-500 resize-none"
+                        />
+                      </td>
+
+                      <td className="p-2">
+                        <select
+                          value={row.type}
+                          onChange={(e) => handleQuestionChange(qIdx, 'type', e.target.value)}
+                          className="w-full p-2 bg-[#111827] border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-500"
+                        >
+                          <option value="scenario">Tình huống</option>
+                          <option value="email">Email</option>
+                          <option value="url">URL</option>
+                          <option value="general">Chung</option>
+                        </select>
+                      </td>
+
+                      {[0, 1, 2, 3].map((optIdx) => {
+                        const opt = row.options?.[optIdx] || { text: '', isCorrect: false };
+                        return (
+                          <td key={optIdx} className="p-2">
+                            <div className={`p-1.5 rounded-lg border flex items-center space-x-2 ${
+                              opt.isCorrect
+                                ? 'bg-emerald-950/40 border-emerald-500'
+                                : 'bg-[#111827] border-slate-800'
+                            }`}>
+                              <input
+                                type="radio"
+                                name={`correct-${qIdx}`}
+                                checked={opt.isCorrect}
+                                onChange={() => handleSetCorrectOption(qIdx, optIdx)}
+                                className="w-3.5 h-3.5 accent-emerald-500 cursor-pointer shrink-0"
+                                title="Chọn làm đáp án đúng"
+                              />
+                              <input
+                                type="text"
+                                value={opt.text}
+                                onChange={(e) => handleOptionTextChange(qIdx, optIdx, e.target.value)}
+                                placeholder={`Phương án ${String.fromCharCode(65 + optIdx)}...`}
+                                className="w-full bg-transparent border-none text-xs text-white focus:outline-none"
+                              />
+                            </div>
+                          </td>
+                        );
+                      })}
+
+                      <td className="p-2">
+                        <textarea
+                          rows={2}
+                          value={row.explanation}
+                          onChange={(e) => handleQuestionChange(qIdx, 'explanation', e.target.value)}
+                          placeholder="Vì sao đáp án đúng, dấu hiệu cảnh báo..."
+                          className="w-full p-2 bg-[#111827] border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-cyan-500 resize-none"
+                        />
+                      </td>
+
+                      <td className="p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveRow(qIdx)}
+                          className="p-1.5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Thanh tác vụ Lưu Chủ đề */}
         <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
