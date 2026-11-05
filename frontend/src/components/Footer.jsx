@@ -76,13 +76,18 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/quiz/fake" className="text-gray-400 hover:text-cyan-400 transition-colors">
-                  Trắc nghiệm Thật/Giả
+                <Link to="/quiz" className="text-gray-400 hover:text-cyan-400 transition-colors">
+                  Trung tâm Quiz An Ninh
+                </Link>
+              </li>
+              <li>
+                <Link to="/quiz/luadao" className="text-gray-400 hover:text-cyan-400 transition-colors">
+                  Quiz Bẫy Lừa Đảo
                 </Link>
               </li>
               <li>
                 <Link to="/quiz/email" className="text-gray-400 hover:text-cyan-400 transition-colors">
-                  Phân tích Email mẫu
+                  Quiz Email Phishing
                 </Link>
               </li>
             </ul>

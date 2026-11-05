@@ -24,6 +24,7 @@ const Header = () => {
 
   const menuItems = [
     { name: 'Tin tức', path: '/news' },
+    { name: 'Quiz An Ninh', path: '/quiz' },
     { name: 'Tài nguyên', path: '/resources' },
     { name: 'Gói Cước', path: '/pricing' }
   ];

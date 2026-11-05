@@ -445,18 +445,24 @@ const Home = () => {
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 shrink-0">
+            <div className="flex flex-col sm:flex-row gap-3 shrink-0">
               <button
-                onClick={() => navigate('/quiz/fake')}
+                onClick={() => navigate('/quiz')}
+                className="px-6 py-3.5 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:scale-105"
+              >
+                Khám Phá Tất Cả Chủ Đề
+              </button>
+              <button
+                onClick={() => navigate('/quiz/luadao')}
                 className="px-6 py-3.5 rounded-2xl bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(234,179,8,0.4)] hover:scale-105"
               >
-                Trắc Nghiệm Web Thật/Giả
+                Quiz Bẫy Lừa Đảo
               </button>
               <button
                 onClick={() => navigate('/quiz/email')}
-                className="px-6 py-3.5 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:scale-105"
+                className="px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs uppercase tracking-wider transition-all hover:scale-105"
               >
-                Bắt Bài Email Lừa Đảo
+                Quiz Email Phishing
               </button>
             </div>
           </div>
