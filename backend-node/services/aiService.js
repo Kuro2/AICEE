@@ -186,7 +186,7 @@ async function sendToGemini(message, history = []) {
   const chatModels = [
     process.env.GEMINI_CHAT_MODEL || 'gemini-flash-lite-latest',
     'gemini-flash-lite-latest',
-    'gemini-3.8-flash',
+    'gemini-3.6-flash',
     'gemini-3.5-flash',
     process.env.GEMINI_MODEL || 'gemini-flash-lite-latest'
   ].filter((v, i, a) => a.indexOf(v) === i);
@@ -220,6 +220,7 @@ async function sendToGemini(message, history = []) {
       });
 
       const result = await chat.sendMessage(cleanMessage);
+      console.log(`[Gemini Chat] ✅ Phản hồi thành công từ model ${modelName}`);
       let responseText = result.response.text().trim();
 
       // Strip markdown code blocks
@@ -351,7 +352,7 @@ async function analyzeFile(fileName, fileType, fileContent, userMessage = '') {
       process.env.GEMINI_VISION_MODEL || 'gemini-flash-lite-latest',
       'gemini-flash-lite-latest',
       'gemini-3.5-flash',
-      'gemini-3.8-flash',
+      'gemini-3.6-flash',
       process.env.GEMINI_MODEL || 'gemini-flash-lite-latest'
     ].filter((v, i, a) => a.indexOf(v) === i);
 
@@ -425,7 +426,10 @@ TUYỆT ĐỐI BẮT BUỘC:
             systemInstruction: SYSTEM_PROMPT
           });
           result = await model.generateContent([promptText, imagePart]);
-          if (result) break;
+          if (result) {
+            console.log(`[Gemini Vision] ✅ Phân tích thành công từ model ${vModel}`);
+            break;
+          }
         } catch (vErr) {
           console.warn(`[Gemini Vision] Model ${vModel} lỗi, tự động thử model dự phòng:`, vErr.message);
           lastVisionErr = vErr;
