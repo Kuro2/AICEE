@@ -7,6 +7,18 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
 const GEMINI_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-flash-lite-latest';
 const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-flash-lite-latest';
 
+// Giới hạn thời gian tối đa cho mỗi lượt gọi model (ngăn chặn tình trạng SDK tự động retry loop khi Google 503 làm treo nhiều phút)
+function callWithTimeout(promise, ms, name) {
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Model ${name} vượt quá ${ms}ms (timeout)`)), ms);
+  });
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    timeoutPromise
+  ]);
+}
+
 // Hệ thống prompt cho AI chuyên về an ninh mạng - Cực kỳ tinh gọn, điềm tĩnh, không lặp ý
 const SYSTEM_PROMPT = `Bạn là chuyên gia an ninh mạng và an toàn số của AICEE. Bạn đóng vai trò như một người bạn hiểu biết, điềm tĩnh, trực tiếp bảo vệ và hướng dẫn người dùng trước các rủi ro lừa đảo trực tuyến.
 
@@ -219,7 +231,7 @@ async function sendToGemini(message, history = []) {
         }
       });
 
-      const result = await chat.sendMessage(cleanMessage);
+      const result = await callWithTimeout(chat.sendMessage(cleanMessage), 6000, modelName);
       console.log(`[Gemini Chat] ✅ Phản hồi thành công từ model ${modelName}`);
       let responseText = result.response.text().trim();
 
@@ -425,7 +437,7 @@ TUYỆT ĐỐI BẮT BUỘC:
             model: vModel,
             systemInstruction: SYSTEM_PROMPT
           });
-          result = await model.generateContent([promptText, imagePart]);
+          result = await callWithTimeout(model.generateContent([promptText, imagePart]), 8000, vModel);
           if (result) {
             console.log(`[Gemini Vision] ✅ Phân tích thành công từ model ${vModel}`);
             break;
