@@ -3,9 +3,9 @@ const fs = require('fs');
 const { decodeQRFromImage, analyzeQRPayload } = require('./qrService');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
-const GEMINI_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-3.8-flash';
-const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-3.5-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
+const GEMINI_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-flash-lite-latest';
+const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-flash-lite-latest';
 
 // Hệ thống prompt cho AI chuyên về an ninh mạng - Cực kỳ tinh gọn, điềm tĩnh, không lặp ý
 const SYSTEM_PROMPT = `Bạn là chuyên gia an ninh mạng và an toàn số của AICEE. Bạn đóng vai trò như một người bạn hiểu biết, điềm tĩnh, trực tiếp bảo vệ và hướng dẫn người dùng trước các rủi ro lừa đảo trực tuyến.
@@ -173,8 +173,11 @@ async function sendToGemini(message, history = []) {
   }
 
   const chatModels = [
-    process.env.GEMINI_CHAT_MODEL || 'gemini-3.8-flash',
-    process.env.GEMINI_MODEL || 'gemini-3.5-flash'
+    process.env.GEMINI_CHAT_MODEL || 'gemini-flash-lite-latest',
+    'gemini-flash-lite-latest',
+    'gemini-3.8-flash',
+    'gemini-3.5-flash',
+    process.env.GEMINI_MODEL || 'gemini-flash-lite-latest'
   ].filter((v, i, a) => a.indexOf(v) === i);
 
   // Lọc lịch sử hợp lệ và đổi role từ 'ai' thành 'model' nếu có
@@ -331,15 +334,18 @@ async function analyzeFile(fileName, fileType, fileContent, userMessage = '') {
 
   // 4. Xử lý Trường hợp B (Ảnh chụp đoạn chat/website CÓ chứa mã QR)
   // và Trường hợp C (Ảnh chụp màn hình thông thường KHÔNG CÓ mã QR)
-  // => Đều chuyển tiếp cho Gemini Vision để phân tích toàn bộ ngữ cảnh
+  // => Đều chuyển tiếp cho Gemini Vision để phân tích toàn bộ ngữ cảnh (kèm chuỗi fallback)
   if (GEMINI_API_KEY && imageBuffer) {
+    const visionModels = [
+      process.env.GEMINI_VISION_MODEL || 'gemini-flash-lite-latest',
+      'gemini-flash-lite-latest',
+      'gemini-3.5-flash',
+      'gemini-3.8-flash',
+      process.env.GEMINI_MODEL || 'gemini-flash-lite-latest'
+    ].filter((v, i, a) => a.indexOf(v) === i);
+
     try {
       const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({
-        model: GEMINI_VISION_MODEL || GEMINI_MODEL || 'gemini-3.5-flash',
-        systemInstruction: SYSTEM_PROMPT
-      });
-
       const mime = fileType && fileType.startsWith('image/') ? fileType : 'image/jpeg';
       const imagePart = {
         inlineData: {
@@ -399,7 +405,23 @@ TUYỆT ĐỐI BẮT BUỘC:
 - Mỗi gạch đầu dòng chỉ từ 1 câu ngắn, không giải thích dông dài.`;
       }
 
-      const result = await model.generateContent([promptText, imagePart]);
+      let result = null;
+      let lastVisionErr = null;
+      for (const vModel of visionModels) {
+        try {
+          const model = genAI.getGenerativeModel({
+            model: vModel,
+            systemInstruction: SYSTEM_PROMPT
+          });
+          result = await model.generateContent([promptText, imagePart]);
+          if (result) break;
+        } catch (vErr) {
+          console.warn(`[Gemini Vision] Model ${vModel} lỗi, tự động thử model dự phòng:`, vErr.message);
+          lastVisionErr = vErr;
+        }
+      }
+
+      if (!result) throw lastVisionErr;
       let responseText = result.response.text().trim();
 
       // Dọn dẹp markdown code block

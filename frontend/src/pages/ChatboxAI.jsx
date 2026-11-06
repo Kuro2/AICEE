@@ -211,9 +211,7 @@ const ChatboxAI = () => {
         const result = await uploadAPI.analyze(fileList, sessionId, currentInput, previews);
 
         if (result.success) {
-          const combined = result.data.analyses
-            .map((a) => `**${a.fileName}**:\n${a.text}`)
-            .join('\n\n---\n\n');
+          const combined = result.data.analyses?.length === 1 ? result.data.analyses[0].text : result.data.analyses.map((a) => `**${a.fileName}**:\n${a.text}`).join('\n\n---\n\n');
           aiResponse = {
             id: result.data.aiMessage?.id,
             text: combined,
@@ -343,21 +341,97 @@ const ChatboxAI = () => {
     return labels[status] || 'Thông tin';
   };
 
-  // Render markdown-like formatting (bold, newlines)
-  const renderText = (text) => {
-    return text
-      .split('\n')
-      .map((line, i) => {
-        const parts = line.split(/\*\*(.*?)\*\*/g);
+    // Helper render inline code and bold text
+  const renderInline = (str) => {
+    const codeParts = str.split(/(`[^`]+`)/g);
+    return codeParts.map((codePart, idx) => {
+      if (codePart.startsWith('`') && codePart.endsWith('`')) {
         return (
-          <span key={i}>
-            {parts.map((part, j) =>
-              j % 2 === 1 ? <strong key={j}>{part}</strong> : part
-            )}
-            {i < text.split('\n').length - 1 && <br />}
-          </span>
+          <code key={idx} className="px-1.5 py-0.5 mx-0.5 rounded bg-black/40 text-cyan-300 font-mono text-[12px] border border-cyan-500/20">
+            {codePart.slice(1, -1)}
+          </code>
         );
-      });
+      }
+      const boldParts = codePart.split(/\*\*(.*?)\*\*/g);
+      return boldParts.map((part, j) =>
+        j % 2 === 1 ? <strong key={`${idx}-${j}`} className="font-semibold text-white">{part}</strong> : part
+      );
+    });
+  };
+
+  // Render markdown-like formatting (headings, badges, bullets, bold, code)
+  const renderText = (text) => {
+    if (!text) return null;
+    const lines = text.split('\n');
+
+    return lines.map((rawLine, i) => {
+      const line = rawLine.trim();
+
+      // Heading 3 / Heading 2 (### or ##)
+      if (line.startsWith('### ') || line.startsWith('## ')) {
+        const headingText = line.replace(/^(###|##)\s*/, '');
+        const headingLower = headingText.toLowerCase();
+
+        if (headingLower.includes('cách thức') || headingLower.includes('cơ sở') || headingLower.startsWith('1.')) {
+          return (
+            <div key={i} className="flex items-center gap-2 mt-3.5 mb-2 pb-1.5 border-b border-cyan-500/30 text-cyan-300 font-bold text-sm tracking-wide">
+              <span className="flex-shrink-0 w-6 h-6 rounded-md bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-xs">⚙️</span>
+              <span>{headingText}</span>
+            </div>
+          );
+        }
+
+        if (headingLower.includes('dấu hiệu') || headingLower.includes('đáng ngờ') || headingLower.startsWith('2.')) {
+          return (
+            <div key={i} className="flex items-center gap-2 mt-3.5 mb-2 pb-1.5 border-b border-amber-500/30 text-amber-300 font-bold text-sm tracking-wide">
+              <span className="flex-shrink-0 w-6 h-6 rounded-md bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-xs">🔍</span>
+              <span>{headingText}</span>
+            </div>
+          );
+        }
+
+        if (headingLower.includes('biện pháp') || headingLower.includes('phòng tránh') || headingLower.includes('nên làm') || headingLower.startsWith('3.')) {
+          return (
+            <div key={i} className="flex items-center gap-2 mt-3.5 mb-2 pb-1.5 border-b border-emerald-500/30 text-emerald-300 font-bold text-sm tracking-wide">
+              <span className="flex-shrink-0 w-6 h-6 rounded-md bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-xs">🛡️</span>
+              <span>{headingText}</span>
+            </div>
+          );
+        }
+
+        return (
+          <div key={i} className="mt-3 mb-1.5 text-white font-bold text-sm">
+            {renderInline(headingText)}
+          </div>
+        );
+      }
+
+      // Divider line
+      if (line === '---' || line === '___') {
+        return <hr key={i} className="my-2.5 border-white/10" />;
+      }
+
+      // Bullet list item
+      if (line.startsWith('• ') || line.startsWith('- ') || line.startsWith('* ')) {
+        const itemContent = line.slice(2).trim();
+        return (
+          <div key={i} className="flex items-start gap-2 py-0.5 pl-1 text-[13px] text-gray-200">
+            <span className="text-cyan-400 font-bold text-xs mt-0.5 flex-shrink-0">•</span>
+            <div className="leading-relaxed flex-1">{renderInline(itemContent)}</div>
+          </div>
+        );
+      }
+
+      if (!line) {
+        return <div key={i} className="h-1.5" />;
+      }
+
+      return (
+        <div key={i} className="text-[13px] leading-relaxed text-gray-200">
+          {renderInline(line)}
+        </div>
+      );
+    });
   };
 
   return (
@@ -550,9 +624,9 @@ const ChatboxAI = () => {
 
                     {/* Text */}
                     {message.text && (
-                      <p className="whitespace-pre-line text-sm leading-relaxed">
+                      <div className="space-y-1 text-sm leading-relaxed">
                         {renderText(message.text)}
-                      </p>
+                      </div>
                     )}
 
                     {/* Recommendations */}
