@@ -222,20 +222,39 @@ function formatScanResponse(scanType, result) {
 
   const msg = statusMessages[result.status] || statusMessages.info;
 
-  let text = `${msg.emoji} **Kết quả: ${msg.label}**\n\n`;
+  let text = `${msg.emoji} [${msg.label}] — Điểm an toàn: ${result.score}/100\n\n`;
 
-  if (result.issues.length > 0) {
-    text += `📋 **Phát hiện:**\n${result.issues.map(i => `• ${i}`).join('\n')}\n\n`;
+  text += `### 1. Cách thức hệ thống đưa ra kết luận\n`;
+  if (scanType === 'url') {
+    text += `• Phân tích kỹ thuật: Kiểm tra giao thức bảo mật (HTTPS/HTTP), cấu trúc domain và phần mở rộng (TLD).\n`;
+    text += `• Đối chiếu cơ sở dữ liệu: So khớp danh sách đen (Blacklist) tên miền lừa đảo và kho dữ liệu phishing tại Việt Nam.\n\n`;
+  } else if (scanType === 'email') {
+    text += `• Phân tích định danh: Kiểm tra tính hợp lệ của địa chỉ hòm thư và độ tin cậy máy chủ tên miền gửi thư.\n`;
+    text += `• Phân tích ngữ cảnh: Nhận diện thủ thuật Social Engineering (áp lực thời gian, yêu cầu nhạy cảm, tiền bạc).\n\n`;
+  } else if (scanType === 'phone') {
+    text += `• Đối chiếu thuê bao: Tra cứu với cơ sở dữ liệu số điện thoại bị phản ánh lừa đảo, quấy rối.\n`;
+    text += `• Kiểm tra cước phí & đầu số: Phân tích định dạng đầu số đặc biệt (1900/1800) và độ dài số chuẩn viễn thông VN.\n\n`;
   } else {
-    text += `📋 **Không phát hiện vấn đề đáng ngờ.**\n\n`;
+    text += `• Phân tích tự động dựa trên bộ quy tắc an ninh mạng và dữ liệu giám sát an toàn thông tin AICEE.\n\n`;
+  }
+
+  text += `### 2. Giải thích các dấu hiệu đáng ngờ\n`;
+  if (result.issues.length > 0) {
+    text += result.issues.map(i => `• ${i}`).join('\n') + `\n\n`;
+  } else {
+    text += `• Không phát hiện dấu hiệu lừa đảo, giả mạo hay nguy cơ độc hại trong nội dung được kiểm tra.\n\n`;
   }
 
   const recommendations = {
-    safe: ['Vẫn nên cẩn thận khi cung cấp thông tin cá nhân', 'Kiểm tra lại nguồn gốc trước khi tin tưởng hoàn toàn'],
-    warning: ['Thận trọng trước khi thực hiện bất kỳ hành động nào', 'Xác minh thông tin qua kênh chính thức', 'Không cung cấp thông tin nhạy cảm'],
-    danger: ['KHÔNG nhấp vào liên kết hoặc thực hiện theo yêu cầu', 'Chặn và báo cáo ngay', 'Liên hệ cơ quan chức năng nếu đã bị thiệt hại'],
-    info: ['Luôn kiểm tra thông tin từ nhiều nguồn', 'Báo cáo nếu phát hiện dấu hiệu lừa đảo']
+    safe: ['Duy trì thói quen cẩn trọng trước khi cung cấp thông tin nhạy cảm', 'Kiểm tra biểu tượng bảo mật HTTPS trên trình duyệt web'],
+    warning: ['Thận trọng, không thực hiện hành động chuyển tiền hoặc cung cấp thông tin', 'Chủ động xác minh danh tính người gửi qua kênh liên hệ chính thống', 'Không nhấp vào các liên kết lạ hoặc quét mã QR đáng ngờ'],
+    danger: ['Tuyệt đối KHÔNG nhấp vào liên kết, không tải file đính kèm và không làm theo hướng dẫn', 'Không chia sẻ mật khẩu, mã OTP, số tài khoản hay mã PIN Smart OTP', 'Chặn ngay người gửi/số máy này và gửi báo cáo lên hệ thống AICEE để cảnh báo cộng đồng'],
+    info: ['Luôn kiểm chứng thông tin từ nhiều nguồn chính thống', 'Báo cáo ngay cho cơ quan chức năng hoặc AICEE nếu phát hiện dấu hiệu lừa đảo']
   };
+
+  const recList = recommendations[result.status] || [];
+  text += `### 3. Đề xuất biện pháp phòng tránh\n`;
+  text += recList.map(r => `• ${r}`).join('\n');
 
   return {
     text,
@@ -243,7 +262,7 @@ function formatScanResponse(scanType, result) {
     score: result.score,
     issues: result.issues,
     details: result.details,
-    recommendations: recommendations[result.status] || []
+    recommendations: recList
   };
 }
 
