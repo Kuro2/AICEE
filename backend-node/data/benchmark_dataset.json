@@ -1,0 +1,276 @@
+[
+  {
+    "id": "URL_01",
+    "type": "url",
+    "input": "http://vietcombank-ebanking.xyz/login",
+    "groundTruth": "danger",
+    "scenario": "Phishing mạo danh Vietcombank qua tên miền lạ .xyz và thiếu HTTPS",
+    "threatCategory": "Brand Impersonation / Phishing"
+  },
+  {
+    "id": "URL_02",
+    "type": "url",
+    "input": "https://bidv-smart-login.top/verify-account",
+    "groundTruth": "danger",
+    "scenario": "Phishing BIDV chứa từ khóa verify-account trên TLD .top",
+    "threatCategory": "Credential Harvesting"
+  },
+  {
+    "id": "URL_03",
+    "type": "url",
+    "input": "http://192.168.1.105/mbbank/update-info",
+    "groundTruth": "danger",
+    "scenario": "URL sử dụng địa chỉ IP trực tiếp thay vì tên miền",
+    "threatCategory": "Direct IP Hosting Phishing"
+  },
+  {
+    "id": "URL_04",
+    "type": "url",
+    "input": "https://free-gift-shopee-online-vn.club/claim",
+    "groundTruth": "danger",
+    "scenario": "Tên miền nhái Shopee chứa từ khóa free-gift và TLD .club",
+    "threatCategory": "Lottery / Scam Gift"
+  },
+  {
+    "id": "URL_05",
+    "type": "url",
+    "input": "https://vietcombank.com.vn",
+    "groundTruth": "safe",
+    "scenario": "Trang web chính thức của Ngân hàng TMCP Ngoại thương Việt Nam",
+    "threatCategory": "Legitimate Bank"
+  },
+  {
+    "id": "URL_06",
+    "type": "url",
+    "input": "https://chinhphu.vn",
+    "groundTruth": "safe",
+    "scenario": "Cổng thông tin điện tử Chính phủ nước CHXHCN Việt Nam",
+    "threatCategory": "Legitimate Government"
+  },
+  {
+    "id": "URL_07",
+    "type": "url",
+    "input": "https://vnexpress.net",
+    "groundTruth": "safe",
+    "scenario": "Báo điện tử VnExpress chính thống",
+    "threatCategory": "Legitimate News"
+  },
+  {
+    "id": "URL_08",
+    "type": "url",
+    "input": "https://dantri.com.vn",
+    "groundTruth": "safe",
+    "scenario": "Báo điện tử Dân trí chính thống",
+    "threatCategory": "Legitimate News"
+  },
+  {
+    "id": "URL_09",
+    "type": "url",
+    "input": "http://truongtieuhoc-dongda.site",
+    "groundTruth": "warning",
+    "scenario": "Trang web giáo dục cơ sở dùng TLD .site và chưa có HTTPS",
+    "threatCategory": "Suspicious / Unencrypted"
+  },
+  {
+    "id": "URL_10",
+    "type": "url",
+    "input": "https://bit.ly/nhan-thuong-tet-2026",
+    "groundTruth": "warning",
+    "scenario": "Liên kết rút gọn bit.ly che giấu đích đến thực tế",
+    "threatCategory": "URL Shortener / Obfuscation"
+  },
+  {
+    "id": "EMAIL_01",
+    "type": "email",
+    "input": "support@tempmail.com",
+    "subject": "Khẩn cấp: Xác nhận thông tin tài khoản ngân hàng trong 24h",
+    "body": "Tài khoản của bạn sẽ bị tạm ngưng nếu không xác nhận mật khẩu và mã OTP ngay lập tức.",
+    "groundTruth": "danger",
+    "scenario": "Email từ dịch vụ email rác đòi mật khẩu và OTP khẩn cấp",
+    "threatCategory": "Urgent Phishing / Temp Mail"
+  },
+  {
+    "id": "EMAIL_02",
+    "type": "email",
+    "input": "security@throwam.com",
+    "subject": "Thông báo chuyển tiền quốc tế Western Union",
+    "body": "Bạn có một khoản chuyển tiền 5000 USD đang chờ. Vui lòng thanh toán phí chuyển tiền để nhận.",
+    "groundTruth": "danger",
+    "scenario": "Bẫy phí trước (Advance-fee scam) qua Western Union từ domain rác",
+    "threatCategory": "Advance Fee Fraud"
+  },
+  {
+    "id": "EMAIL_03",
+    "type": "email",
+    "input": "no-reply@vietnamairlines.com",
+    "subject": "Xác nhận đặt vé máy bay điện tử chuyến bay VN218",
+    "body": "Cảm ơn quý khách đã đặt vé chuyến bay Hà Nội - TP.HCM. Mã đặt chỗ của quý khách là ABC123.",
+    "groundTruth": "safe",
+    "scenario": "Email thông báo lịch trình vé máy bay chính thức",
+    "threatCategory": "Legitimate Commercial"
+  },
+  {
+    "id": "EMAIL_04",
+    "type": "email",
+    "input": "cskh@evnhanoi.vn",
+    "subject": "Thông báo tiền điện kỳ 10/2026 của khách hàng",
+    "body": "Tổng công ty Điện lực TP Hà Nội xin thông báo tiền điện tháng này của quý khách là 650.000 VNĐ.",
+    "groundTruth": "safe",
+    "scenario": "Email hóa đơn điện lực nhà nước chính thống",
+    "threatCategory": "Legitimate Utility"
+  },
+  {
+    "id": "EMAIL_05",
+    "type": "email",
+    "input": "recruitment@startup-talent.online",
+    "subject": "Mời phỏng vấn vị trí Thực tập sinh CNTT",
+    "body": "Chúng tôi đã xem CV của bạn và muốn mời bạn tham gia buổi phỏng vấn trực tuyến vào thứ Hai tới.",
+    "groundTruth": "warning",
+    "scenario": "Email tuyển dụng từ tên miền mới chưa xác minh uy tín",
+    "threatCategory": "Unverified Recruiter"
+  },
+  {
+    "id": "PHONE_01",
+    "type": "phone",
+    "input": "0987654321",
+    "groundTruth": "info",
+    "scenario": "Số điện thoại di động mạng Viettel định dạng chuẩn",
+    "threatCategory": "Standard Mobile"
+  },
+  {
+    "id": "PHONE_02",
+    "type": "phone",
+    "input": "0901234567",
+    "groundTruth": "info",
+    "scenario": "Số điện thoại di động mạng MobiFone định dạng chuẩn",
+    "threatCategory": "Standard Mobile"
+  },
+  {
+    "id": "PHONE_03",
+    "type": "phone",
+    "input": "19006789",
+    "groundTruth": "warning",
+    "scenario": "Đầu số tổng đài dịch vụ 1900 có thể tính cước phí cao",
+    "threatCategory": "Premium Rate Telephony"
+  },
+  {
+    "id": "PHONE_04",
+    "type": "phone",
+    "input": "01234",
+    "groundTruth": "danger",
+    "scenario": "Số điện thoại có độ dài bất thường không hợp lệ",
+    "threatCategory": "Invalid / Spoofed Number"
+  },
+  {
+    "id": "QR_01",
+    "type": "qr",
+    "input": "http://vietcombank-login.xyz/otp",
+    "groundTruth": "danger",
+    "scenario": "Mã QR chứa liên kết giả mạo ngân hàng đòi mã OTP",
+    "threatCategory": "Quishing (QR Phishing)"
+  },
+  {
+    "id": "QR_02",
+    "type": "qr",
+    "input": "00020101021238540010A000000727012400069704220110036407752453037045802VN6304ABCD",
+    "groundTruth": "warning",
+    "scenario": "Mã VietQR chuyển khoản cá nhân tự động điền tài khoản",
+    "threatCategory": "VietQR Payment Request"
+  },
+  {
+    "id": "QR_03",
+    "type": "qr",
+    "input": "WIFI:S:AICEE_Lab;T:WPA;P:Security2026;;",
+    "groundTruth": "safe",
+    "scenario": "Mã QR chia sẻ cấu hình mạng WiFi nội bộ",
+    "threatCategory": "Legitimate WiFi Config"
+  },
+  {
+    "id": "QR_04",
+    "type": "qr",
+    "input": "https://chinhphu.vn",
+    "groundTruth": "safe",
+    "scenario": "Mã QR dẫn tới Cổng thông tin Chính phủ",
+    "threatCategory": "Legitimate QR"
+  },
+  {
+    "id": "TEXT_01",
+    "type": "text",
+    "input": "Thầy ơi, vợ mình báo bé Susu nhà mình bị té. Bác Sĩ bảo là bị chấn thương sọ não. H em lại không mang theo tiền để làm thủ tục. Cần phải chuyển tiền để làm phẫu thuật gấp anh",
+    "groundTruth": "danger",
+    "scenario": "Kịch bản con đang cấp cứu ở bệnh viện mạo danh giáo viên",
+    "threatCategory": "Emergency Impersonation"
+  },
+  {
+    "id": "TEXT_02",
+    "type": "text",
+    "input": "Cuc Canh sat giao thong thong bao: Phuong tien 29A-123.45 vi pham phat nguoi 5.000.000d. Truy cap http://phatnguoi-csgt.xyz de nop phat hoac bi tich thu bang lai.",
+    "groundTruth": "danger",
+    "scenario": "Tin nhắn giả mạo CSGT phạt nguội dọa tước bằng lái",
+    "threatCategory": "Government Impersonation"
+  },
+  {
+    "id": "TEXT_03",
+    "type": "text",
+    "input": "Chuc mung ban da trung thuong xe may SH 150i tu chuong trinh tri an khach hang. Vui long chuyen khoan 3 trieu dong phi lam ho so nhan xe.",
+    "groundTruth": "danger",
+    "scenario": "Tin nhắn trúng thưởng xe máy đòi nộp phí trước",
+    "threatCategory": "Lottery Scam"
+  },
+  {
+    "id": "TEXT_04",
+    "type": "text",
+    "input": "Tuyen cong tac vien xem video TikTok tai nha, kiem 300k - 500k/ngay, hoa hong 30% moi don hang. Lien he Zalo de nhan nhiem vu.",
+    "groundTruth": "danger",
+    "scenario": "Bẫy tuyển dụng việc nhẹ lương cao làm nhiệm vụ online",
+    "threatCategory": "Job Scam"
+  },
+  {
+    "id": "TEXT_05",
+    "type": "text",
+    "input": "Ngan hang thong bao: Phat hien giao dich bat thuong 20.000.000d tren tai khoan cua ban. Cung cap ma OTP ngay de huy giao dich.",
+    "groundTruth": "danger",
+    "scenario": "Tin nhắn giả mạo ngân hàng dọa trừ tiền và đòi mã OTP",
+    "threatCategory": "Banking OTP Theft"
+  },
+  {
+    "id": "TEXT_06",
+    "type": "text",
+    "input": "Làm thế nào để bật xác thực hai yếu tố (2FA) cho tài khoản Facebook và Google?",
+    "groundTruth": "info",
+    "scenario": "Người dùng hỏi mẹo tư vấn cài đặt an toàn bảo mật thông tin",
+    "threatCategory": "Security Advice"
+  },
+  {
+    "id": "TEXT_07",
+    "type": "text",
+    "input": "Phishing là gì và người dùng phổ thông cần lưu ý những dấu hiệu nào để phòng tránh?",
+    "groundTruth": "info",
+    "scenario": "Người dùng tìm hiểu kiến thức lý thuyết về tấn công phi kỹ thuật",
+    "threatCategory": "Security Knowledge"
+  },
+  {
+    "id": "TEXT_08",
+    "type": "text",
+    "input": "Nhà trường xin thông báo lịch họp phụ huynh đầu năm học 2026-2027 diễn ra vào sáng Chủ Nhật tuần này tại phòng học lớp 10A1.",
+    "groundTruth": "info",
+    "scenario": "Thông báo thông thường từ trường học không có dấu hiệu độc hại",
+    "threatCategory": "Benign Notice"
+  },
+  {
+    "id": "TEXT_09",
+    "type": "text",
+    "input": "Trang web này có phải trang chính thức của Đại học FPT không: https://daihoc.fpt.edu.vn ?",
+    "groundTruth": "safe",
+    "scenario": "Hỏi về cổng thông tin trường đại học chính thống",
+    "threatCategory": "Legitimate Inquiry"
+  },
+  {
+    "id": "TEXT_10",
+    "type": "text",
+    "input": "Bạn ơi, chiều nay mình bận chút việc, bạn gửi giúp mình tài liệu bài tập nhóm qua email nhé.",
+    "groundTruth": "info",
+    "scenario": "Tin nhắn hội thoại thông thường giữa bạn bè",
+    "threatCategory": "Normal Conversation"
+  }
+]

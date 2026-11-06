@@ -1,0 +1,38 @@
+{
+  "timestamp": "2026-11-06T16:35:49.840Z",
+  "datasetSize": 33,
+  "metrics": {
+    "exactAccuracy": 90.91,
+    "binaryAccuracy": 96.97,
+    "precision": 100,
+    "recall": 94.44,
+    "f1Score": 97.14,
+    "avgLatencyMs": 0.09
+  },
+  "confusionMatrix": {
+    "tp": 17,
+    "fp": 0,
+    "tn": 15,
+    "fn": 1
+  },
+  "mismatches": [
+    {
+      "id": "URL_09",
+      "scenario": "Trang web giáo dục cơ sở dùng TLD .site và chưa có HTTPS",
+      "groundTruth": "warning",
+      "predicted": "danger"
+    },
+    {
+      "id": "EMAIL_05",
+      "scenario": "Email tuyển dụng từ tên miền mới chưa xác minh uy tín",
+      "groundTruth": "warning",
+      "predicted": "safe"
+    },
+    {
+      "id": "PHONE_03",
+      "scenario": "Đầu số tổng đài dịch vụ 1900 có thể tính cước phí cao",
+      "groundTruth": "warning",
+      "predicted": "danger"
+    }
+  ]
+}

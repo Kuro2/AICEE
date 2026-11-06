@@ -105,6 +105,17 @@ function analyzeWithHeuristic(message) {
     return { type: 'phone', status: 'danger', details: {} };
   }
 
+  // Cac mau kich ban lua dao tin nhan pho bien tai Viet Nam
+  const hasEmergencyScam = (lower.includes('cấp cứu') || lower.includes('chấn thương sọ não') || lower.includes('phẫu thuật') || lower.includes('tai nạn')) && (lower.includes('chuyển tiền') || lower.includes('tiền') || lower.includes('viện phí'));
+  const hasLotteryScam = (lower.includes('trúng thưởng') || lower.includes('tri ân') || lower.includes('nhận xe') || lower.includes('trung thuong')) && (lower.includes('chuyển khoản') || lower.includes('phí') || lower.includes('phi'));
+  const hasJobScam = (lower.includes('tuyển') || lower.includes('cộng tác viên') || lower.includes('tiktok') || lower.includes('nhiệm vụ') || lower.includes('nhiem vu')) && (lower.includes('hoa hồng') || lower.includes('hoa hong') || lower.includes('kiếm') || lower.includes('kiem'));
+  const hasBankOtpScam = (lower.includes('ngân hàng') || lower.includes('ngan hang') || lower.includes('tài khoản') || lower.includes('giao dịch bất thường') || lower.includes('giao dich')) && (lower.includes('mã otp') || lower.includes('otp') || lower.includes('mật khẩu') || lower.includes('hủy giao dịch') || lower.includes('huy giao dich'));
+  const hasPoliceScam = (lower.includes('cảnh sát giao thông') || lower.includes('công an') || lower.includes('phạt nguội') || lower.includes('phat nguoi') || lower.includes('csgt')) && (lower.includes('nộp phạt') || lower.includes('nop phat') || lower.includes('tước bằng lái') || lower.includes('tich thu'));
+
+  if (hasEmergencyScam || hasLotteryScam || hasJobScam || hasBankOtpScam || hasPoliceScam) {
+    return { type: 'scam_text', status: 'danger', details: { hasEmergencyScam, hasLotteryScam, hasJobScam, hasBankOtpScam, hasPoliceScam } };
+  }
+
   if (isSafetyQuestion) {
     return { type: 'advice', status: 'info', details: {} };
   }
@@ -387,13 +398,13 @@ Hãy trả lời CỰC KỲ NGẮN GỌN, đi thẳng vào bản chất, không 
 Kẻ gian giả làm ai, bịa chuyện gì rồi giục chuyển tiền gấp để bạn hoảng mà không kịp kiểm tra. Có mấy điểm đáng ngờ:
 
 Mục "Có mấy điểm đáng ngờ:" (chỉ nêu 2-3 gạch đầu dòng ngắn, mỗi dòng 1 câu):
-- Tin nhắn từ số lạ, không phải số chính thức bạn đã lưu.
-- Liên tục thúc giục, dùng từ ngữ tạo áp lực và hoảng sợ.
-- Mâu thuẫn với quy trình thực tế (bệnh viện luôn cấp cứu trước không bắt chuyển tiền cá nhân mới mổ; cơ quan nhà nước không làm việc qua tin nhắn).
+- Tin nhắn từ số lạ, không phải số giáo viên bạn đã lưu.
+- Liên tục thúc giục, dùng từ "nguy kịch" để tạo áp lực.
+- Bệnh viện luôn cấp cứu trước, không bắt chuyển tiền cá nhân rồi mới mổ.
 
 Mục "Bạn nên làm ngay:" (chỉ nêu 2-3 gạch đầu dòng hành động ngắn, không lặp lại ý bên trên):
 - Không chuyển tiền, không trả lời số này.
-- Gọi giáo viên chủ nhiệm hoặc người có liên quan bằng số điện thoại đã lưu từ trước để hỏi về con.
+- Gọi giáo viên chủ nhiệm hoặc nhà trường bằng số đã lưu để hỏi về con.
 - Chặn số và báo nhà mạng hoặc công an.
 
 Đoạn kết (1 câu):

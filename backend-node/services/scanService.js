@@ -69,8 +69,8 @@ function analyzeUrl(url) {
 
     // Kiểm tra blacklist
     if (BLACKLISTED_DOMAINS.includes(hostname)) {
-      result.issues.push('Domain nằm trong danh sách theo dõi');
-      result.score -= 20;
+      result.issues.push('Domain nằm trong danh sách rút gọn link / theo dõi');
+      result.score -= 35;
     }
 
     result.details = {
@@ -191,8 +191,9 @@ function analyzePhone(phone) {
 
   // Kiểm tra số quá ngắn hoặc quá dài
   if (cleanPhone.length < 9 || cleanPhone.length > 13) {
-    result.issues.push('Độ dài số điện thoại bất thường');
-    result.score -= 30;
+    result.issues.push('Độ dài số điện thoại bất thường hoặc có dấu hiệu mạo danh');
+    result.score -= 50;
+    result.status = 'danger';
   }
 
   result.details = {
