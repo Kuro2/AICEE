@@ -32,8 +32,6 @@ const AdminQuizEditor = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isEditing = Boolean(id);
-  const DRAFT_KEY = isEditing ? `aicee_quiz_draft_${id}` : 'aicee_quiz_draft_new';
-
   // Chế độ xem câu hỏi: 'card' (thẻ dọc rộng rãi, dễ đọc) | 'table' (bảng ngang thu gọn)
   const [viewMode, setViewMode] = useState('card');
 
@@ -77,7 +75,7 @@ const AdminQuizEditor = () => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // 1. Tải dữ liệu ban đầu hoặc Khôi phục bản nháp tạm thời (localStorage)
+  // 1. Tải dữ liệu ban đầu nếu là chế độ Sửa
   useEffect(() => {
     if (isEditing) {
       const fetchTopicDetail = async () => {
@@ -86,55 +84,28 @@ const AdminQuizEditor = () => {
           const res = await adminAPI.getQuizTopic(id);
           if (res.success && res.data?.topic) {
             const t = res.data.topic;
+            setTopicForm({
+              title: t.title || '',
+              slug: t.slug || '',
+              description: t.description || '',
+              category: t.category || 'scenario',
+              difficulty: t.difficulty || 'medium',
+              status: t.status || 'published'
+            });
 
-            // Kiểm tra xem có bản nháp chưa lưu cho chủ đề này không
-            let hasRestoredDraft = false;
-            try {
-              const draftStr = localStorage.getItem(`aicee_quiz_draft_${id}`);
-              if (draftStr) {
-                const draft = JSON.parse(draftStr);
-                if (draft && Array.isArray(draft.questions) && draft.questions.length > 0) {
-                  setTopicForm(draft.topicForm || {
-                    title: t.title || '',
-                    slug: t.slug || '',
-                    description: t.description || '',
-                    category: t.category || 'scenario',
-                    difficulty: t.difficulty || 'medium',
-                    status: t.status || 'published'
-                  });
-                  setGridQuestions(draft.questions);
-                  setDraftRestored(draft.savedAt || 'trước đó');
-                  hasRestoredDraft = true;
-                }
-              }
-            } catch (e) {
-              console.warn('Lỗi đọc nháp:', e);
-            }
+            const mapped = (t.questions || []).map((q, idx) => ({
+              tempId: idx + 1,
+              title: q.title || '',
+              type: q.type || 'scenario',
+              difficulty: q.difficulty || 'medium',
+              explanation: q.explanation || '',
+              options: (q.options || []).map(o => ({
+                text: o.text || '',
+                isCorrect: o.isCorrect === true
+              }))
+            }));
 
-            if (!hasRestoredDraft) {
-              setTopicForm({
-                title: t.title || '',
-                slug: t.slug || '',
-                description: t.description || '',
-                category: t.category || 'scenario',
-                difficulty: t.difficulty || 'medium',
-                status: t.status || 'published'
-              });
-
-              const mapped = (t.questions || []).map((q, idx) => ({
-                tempId: idx + 1,
-                title: q.title || '',
-                type: q.type || 'scenario',
-                difficulty: q.difficulty || 'medium',
-                explanation: q.explanation || '',
-                options: (q.options || []).map(o => ({
-                  text: o.text || '',
-                  isCorrect: o.isCorrect === true
-                }))
-              }));
-
-              setGridQuestions(mapped);
-            }
+            setGridQuestions(mapped);
           } else {
             showToast('Không tìm thấy chủ đề', 'error');
             navigate('/admin/quiz');
@@ -147,56 +118,12 @@ const AdminQuizEditor = () => {
       };
       fetchTopicDetail();
     } else {
-      // Chế độ TẠO MỚI: Kiểm tra xem có bản nháp chưa lưu trong localStorage không
-      try {
-        const draftStr = localStorage.getItem('aicee_quiz_draft_new');
-        if (draftStr) {
-          const draft = JSON.parse(draftStr);
-          if (draft && Array.isArray(draft.questions) && draft.questions.length > 0) {
-            if (draft.topicForm) setTopicForm(draft.topicForm);
-            setGridQuestions(draft.questions);
-            setDraftRestored(draft.savedAt || 'trước đó');
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn('Lỗi đọc nháp tạo mới:', err);
-      }
-
-      // Mặc định tạo mới chưa có nháp: thêm 1 dòng câu hỏi trắng
+      // Mặc định tạo mới: thêm 1 dòng câu hỏi trắng
       setGridQuestions([createEmptyRow(1)]);
     }
   }, [id, isEditing]);
 
-  // 2. Cơ chế TỰ ĐỘNG LƯU NHÁP TẠM THỜI vào localStorage mỗi khi nội dung thay đổi
-  useEffect(() => {
-    if (loadingInitial) return;
-
-    // Chỉ lưu khi có ít nhất 1 câu hỏi có chữ hoặc có tiêu đề chủ đề
-    const hasQuestionContent = gridQuestions.some(q => q.title && q.title.trim().length > 0);
-    const hasTopicContent = topicForm.title && topicForm.title.trim().length > 0;
-
-    if (!hasQuestionContent && !hasTopicContent) return;
-
-    const timer = setTimeout(() => {
-      const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const draftData = {
-        topicForm,
-        questions: gridQuestions,
-        savedAt: nowStr
-      };
-      try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
-        setLastSavedTime(nowStr);
-      } catch (err) {
-        console.warn('Lỗi lưu nháp vào localStorage:', err);
-      }
-    }, 600); // Tự động lưu sau 600ms khi người dùng dừng gõ
-
-    return () => clearTimeout(timer);
-  }, [topicForm, gridQuestions, isEditing, loadingInitial, DRAFT_KEY]);
-
-  // Cảnh báo người dùng nếu vô tình F5 hoặc tắt tab khi câu hỏi chưa lưu vào CSDL
+  // Cảnh báo người dùng nếu vô tình F5 hoặc tắt tab khi đã có nội dung
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       const hasContent = gridQuestions.some(q => q.title && q.title.trim().length > 0);
@@ -208,42 +135,6 @@ const AdminQuizEditor = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [gridQuestions]);
-
-  // Xóa bản nháp tạm thời và bắt đầu lại sạch sẽ
-  const handleClearDraft = () => {
-    if (window.confirm('Bạn có chắc muốn xóa bản nháp tạm thời này và bắt đầu lại từ đầu không?')) {
-      localStorage.removeItem(DRAFT_KEY);
-      setDraftRestored(null);
-      setLastSavedTime(null);
-      setTopicForm({
-        title: '',
-        slug: '',
-        description: '',
-        category: 'scenario',
-        difficulty: 'medium',
-        status: 'published'
-      });
-      setGridQuestions([createEmptyRow(1)]);
-      showToast('Đã xóa bản nháp tạm thời', 'success');
-    }
-  };
-
-  // Nút chủ động lưu nháp thủ công
-  const handleManualSaveDraft = () => {
-    const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const draftData = {
-      topicForm,
-      questions: gridQuestions,
-      savedAt: nowStr
-    };
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
-      setLastSavedTime(nowStr);
-      showToast(`Đã lưu tạm nháp thành công lúc ${nowStr}! (Không lo bị mất khi F5)`);
-    } catch (err) {
-      showToast('Không thể lưu nháp vào trình duyệt', 'error');
-    }
-  };
 
   // 2. Tải danh sách bài báo & báo cáo nguồn để tìm kiếm
   useEffect(() => {
@@ -569,15 +460,6 @@ const AdminQuizEditor = () => {
         showToast('Tạo mới chủ đề trắc nghiệm thành công!');
       }
 
-      // Dọn dẹp bản nháp tạm sau khi lưu thành công vào CSDL
-      try {
-        localStorage.removeItem(DRAFT_KEY);
-        setDraftRestored(null);
-        setLastSavedTime(null);
-      } catch (e) {
-        console.warn('Lỗi dọn nháp:', e);
-      }
-
       // Điều hướng về trang danh sách chủ đề
       setTimeout(() => {
         navigate('/admin/quiz');
@@ -622,20 +504,18 @@ const AdminQuizEditor = () => {
             <ArrowLeft className="w-4 h-4 mr-1.5" />
             Quay lại danh sách Chủ Đề
           </Link>
-          <h1 className="text-2xl font-bold text-white flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold text-white flex items-center space-x-3">
             <span>{isEditing ? 'Chỉnh Sửa Bộ Đề Chủ Đề' : 'Tạo Chủ Đề Trắc Nghiệm Mới'}</span>
             <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-md bg-slate-800 text-cyan-400">
               {gridQuestions.length} câu trên bảng
             </span>
-
           </h1>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-
+        <div className="flex items-center space-x-2">
           <button
             onClick={handleExportExcel}
-            className="px-3 py-2 rounded-xl bg-[#111827] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-white flex items-center space-x-1.5 transition-colors"
+            className="px-3.5 py-2 rounded-xl bg-[#111827] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-white flex items-center space-x-1.5 transition-colors"
           >
             <Download className="w-3.5 h-3.5 text-cyan-400" />
             <span>Xuất Excel</span>

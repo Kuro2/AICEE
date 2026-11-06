@@ -7,31 +7,37 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 const GEMINI_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-3.8-flash';
 const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-3.5-flash';
 
-// Hệ thống prompt cho AI chuyên về an ninh mạng
-const SYSTEM_PROMPT = `Bạn là trợ lý AI thông minh của AICEE - nền tảng bảo vệ an ninh mạng hàng đầu Việt Nam.
+// Hệ thống prompt cho AI chuyên về an ninh mạng - Cực kỳ tinh gọn, điềm tĩnh, không lặp ý
+const SYSTEM_PROMPT = `Bạn là chuyên gia an ninh mạng và an toàn số của AICEE. Bạn đóng vai trò như một người bạn hiểu biết, điềm tĩnh, trực tiếp bảo vệ và hướng dẫn người dùng trước các rủi ro lừa đảo trực tuyến.
 
-Nhiệm vụ của bạn:
-1. Kiểm tra độ an toàn của URL, website, liên kết
-2. Phân tích email có phải lừa đảo (phishing) không
-3. Xác minh số điện thoại có dấu hiệu lừa đảo không
-4. Phân tích file, hình ảnh có chứa nội dung độc hại không
-5. Tư vấn về an ninh mạng, bảo mật thông tin cá nhân
-6. Cảnh báo về các thủ đoạn lừa đảo mới
+NGUYÊN TẮC BẮT BUỘC VỀ ĐỘ DÀI VÀ CẤU TRÚC:
+1. CỰC KỲ NGẮN GỌN VÀ ĐI THẲNG VÀO TRỌNG TÂM:
+   - Người đọc (đặc biệt là người đang lo lắng, hoảng sợ) chỉ cần biết: Đây là gì, vì sao đáng ngờ, và phải làm gì ngay.
+   - Tuyệt đối KHÔNG viết dài dòng. Mỗi gạch đầu dòng chỉ từ 1 đến 2 câu ngắn (không giải thích dông dài).
+   - KHÔNG lặp ý giữa phần phân tích và phần hành động.
 
-Quy tắc trả lời:
-- Luôn trả lời bằng tiếng Việt
-- Rõ ràng, dễ hiểu, thân thiện
-- Phân loại kết quả: AN TOÀN / CẢNH BÁO / NGUY HIỂM / THÔNG TIN
-- Đưa ra khuyến nghị cụ thể
-- Nếu không chắc chắn, hãy nói rõ và khuyên người dùng thận trọng
+2. KHÔNG LẠM DỤNG EMOJI VÀ CHỮ IN HOA:
+   - Tuyệt đối KHÔNG gắn emoji ở đầu mỗi câu hay mỗi gạch đầu dòng (không dùng ❌, 🔍, 💡, 🚫, 🧘, 🏥, 🛑).
+   - KHÔNG viết hoa toàn bộ từ ngữ (ALL CAPS).
 
-Cách trả lời:
-- Luôn dùng tiếng Việt tự nhiên, thân thiện
-- Dùng emoji để làm nổi bật kết quả
-- BẮT ĐẦU câu trả lời với một trong: "✅ AN TOÀN", "⚠️ CẢNH BÁO", "❌ NGUY HIỂM", "ℹ️ THÔNG TIN" tùy theo đánh giá
-- Giải thích rõ lý do
-- Đưa ra khuyến nghị cụ thể
-- Tuyệt đối KHÔNG trả lời dưới dạng JSON hay code block`;
+3. BỐ CỤC CHUẨN XÁC THEO MẪU:
+   Câu 1 (Khẳng định trực diện): "Đây là tin nhắn lừa đảo, bạn đừng chuyển tiền." (hoặc "Đây là trang web chính thức, bạn có thể yên tâm.").
+   
+   Đoạn 2 (1-2 câu tóm tắt kịch bản): Kẻ gian giả làm ai, tạo cớ gì để gây áp lực. Có mấy điểm đáng ngờ:
+   
+   Mục "Có mấy điểm đáng ngờ:"
+   - Dấu hiệu số lạ / mạo danh.
+   - Dấu hiệu thúc ép, từ ngữ tạo hoảng loạn.
+   - Mâu thuẫn với quy trình thực tế (bệnh viện luôn cấp cứu trước, ngân hàng không bao giờ hỏi mật khẩu/OTP).
+   
+   Mục "Bạn nên làm ngay:"
+   - Không chuyển tiền, không trả lời số/tin nhắn này.
+   - Gọi trực tiếp cho người liên quan/nhà trường bằng số điện thoại đã lưu từ trước để hỏi.
+   - Chặn số và báo nhà mạng hoặc công an.
+   
+   Đoạn kết: "Nếu lỡ chuyển tiền, gọi ngay ngân hàng để xin khóa giao dịch và trình báo công an."
+
+Tuyệt đối KHÔNG trả lời dưới dạng JSON hay code block.`;
 
 // Logic phân tích heuristic (không cần AI)
 function analyzeWithHeuristic(message) {
@@ -222,9 +228,29 @@ async function sendToGemini(message, history = []) {
 
       const lower = responseText.toLowerCase();
       let status = 'info';
-      if (lower.startsWith('[an toàn]') || lower.includes('[an toàn]') || lower.includes('an toàn')) status = 'safe';
-      else if (lower.startsWith('[nguy hiểm]') || lower.includes('[nguy hiểm]') || lower.includes('lừa đảo') || lower.includes('nguy hiểm')) status = 'danger';
-      else if (lower.startsWith('[cảnh báo]') || lower.includes('[cảnh báo]') || lower.includes('cảnh báo') || lower.includes('đáng ngờ')) status = 'warning';
+      if (
+        lower.includes('lừa đảo') ||
+        lower.includes('nguy hiểm') ||
+        lower.includes('giả mạo') ||
+        lower.includes('đừng chuyển tiền') ||
+        lower.includes('không chuyển tiền') ||
+        lower.includes('mã độc')
+      ) {
+        status = 'danger';
+      } else if (
+        lower.includes('cảnh báo') ||
+        lower.includes('đáng ngờ') ||
+        lower.includes('cảnh giác') ||
+        lower.includes('thận trọng')
+      ) {
+        status = 'warning';
+      } else if (
+        lower.includes('an toàn') ||
+        lower.includes('chính thức') ||
+        lower.includes('hợp lệ')
+      ) {
+        status = 'safe';
+      }
 
       return { text: responseText, status, recommendations: [] };
     } catch (error) {
@@ -329,22 +355,48 @@ async function analyzeFile(fileName, fileType, fileContent, userMessage = '') {
 Hệ thống đã nhận diện và bóc tách thành công mã QR xuất hiện trong hình ảnh này:
 - Chuỗi dữ liệu/Liên kết thực tế trong mã QR: "${qrResult.data}"
 - Đánh giá kỹ thuật sơ bộ: ${qrAnalysis ? qrAnalysis.summary : 'Chưa rõ'}
-${userMessage ? `[GHI CHÚ / CÂU HỎI CỦA NGƯỜI DÙNG]: "${userMessage}"` : ''}
+${userMessage ? `[Ghi chú / câu hỏi của người dùng]: "${userMessage}"` : ''}
 
-NHIỆM VỤ CỦA BẠN:
-1. Đọc và phân tích toàn bộ nội dung trò chuyện/giao diện trang web trong ảnh (thủ đoạn lừa đảo, mạo danh ngân hàng/công an, yêu cầu chuyển tiền/nạp tiền/làm nhiệm vụ).
-2. Kết hợp với liên kết/mã QR đã giải mã ở trên để đánh giá rủi ro tổng thể.
-3. Đưa ra kết luận rõ ràng (AN TOÀN / CẢNH BÁO / NGUY HIỂM) và hướng dẫn người dùng cách phòng tránh. Bắt đầu bằng "✅ AN TOÀN", "⚠️ CẢNH BÁO", hoặc "❌ NGUY HIỂM".`;
+YÊU CẦU PHÂN TÍCH:
+1. Đọc và phân tích toàn bộ nội dung trong ảnh kết hợp với chuỗi liên kết/mã QR ở trên.
+2. Trả lời theo phong cách điềm tĩnh, ấm áp, thấu cảm và trực diện như một người bạn hiểu biết:
+   - Mở đầu bằng 1 câu khẳng định ngắn gọn bản chất sự việc (Ví dụ: "Đây là tin nhắn lừa đảo, bạn đừng chuyển tiền." hoặc "Mã QR này dẫn đến trang web an toàn, bạn có thể yên tâm.").
+   - Nêu ngắn gọn kịch bản lừa đảo (kẻ gian mạo danh ai, tạo tình huống gì để đánh vào tâm lý).
+   - "Những điểm đáng ngờ trong tin nhắn:" (nêu 2-3 điểm cụ thể: chi tiết vô lý, số điện thoại lạ, mâu thuẫn quy trình thực tế).
+   - "Bạn nên làm gì:" (các bước hành động bình tĩnh: không làm theo, gọi số chính thức từ trước để xác minh, chặn số, liên hệ ngân hàng nếu đã lỡ chuyển).
+3. Tuyệt đối KHÔNG lạm dụng emoji ở đầu mỗi câu (không dùng ❌, 🔍, 💡, 🚫, 🧘, 🏥, 🛑), KHÔNG viết hoa toàn bộ từ ngữ (ALL CAPS).`;
       } else {
         // Trường hợp C: Ảnh chụp màn hình thông thường (SMS, chat, app, hóa đơn)
         promptText = `[PHÂN TÍCH HÌNH ẢNH AN NINH MẠNG]:
-Người dùng gửi hình ảnh này để kiểm tra rủi ro lừa đảo / an toàn bảo mật.
-${userMessage ? `[GHI CHÚ / CÂU HỎI CỦA NGƯỜI DÙNG]: "${userMessage}"` : ''}
+Người dùng gửi hình ảnh này để nhờ kiểm tra xem có phải lừa đảo hay an toàn không.
+${userMessage ? `[Ghi chú / câu hỏi của người dùng]: "${userMessage}"` : ''}
 
-NHIỆM VỤ CỦA BẠN:
-1. Đọc văn bản trong hình ảnh (OCR), kiểm tra xem có dấu hiệu lừa đảo (giả mạo thương hiệu, dọa khóa tài khoản, trúng thưởng, yêu cầu nạp tiền, vay tiền lãi suất thấp, cài app lạ).
-2. Bắt đầu bằng một trong: "✅ AN TOÀN", "⚠️ CẢNH BÁO", "❌ NGUY HIỂM", "ℹ️ THÔNG TIN".
-3. Nêu rõ các dấu hiệu nhận biết và khuyến nghị hành động cụ thể cho người dùng.`;
+YÊU CẦU QUAN TRỌNG:
+Hãy trả lời CỰC KỲ NGẮN GỌN, đi thẳng vào bản chất, không lặp ý, không giải thích dông dài theo đúng cấu trúc mẫu chuẩn sau:
+
+Đoạn 1:
+"Đây là tin nhắn lừa đảo, bạn đừng chuyển tiền." (hoặc "Đây là trang web/thông báo an toàn, bạn có thể yên tâm.")
+
+Đoạn 2 (1-2 câu):
+Kẻ gian giả làm ai, bịa chuyện gì rồi giục chuyển tiền gấp để bạn hoảng mà không kịp kiểm tra. Có mấy điểm đáng ngờ:
+
+Mục "Có mấy điểm đáng ngờ:" (chỉ nêu 2-3 gạch đầu dòng ngắn, mỗi dòng 1 câu):
+- Tin nhắn từ số lạ, không phải số chính thức bạn đã lưu.
+- Liên tục thúc giục, dùng từ ngữ tạo áp lực và hoảng sợ.
+- Mâu thuẫn với quy trình thực tế (bệnh viện luôn cấp cứu trước không bắt chuyển tiền cá nhân mới mổ; cơ quan nhà nước không làm việc qua tin nhắn).
+
+Mục "Bạn nên làm ngay:" (chỉ nêu 2-3 gạch đầu dòng hành động ngắn, không lặp lại ý bên trên):
+- Không chuyển tiền, không trả lời số này.
+- Gọi giáo viên chủ nhiệm hoặc người có liên quan bằng số điện thoại đã lưu từ trước để hỏi về con.
+- Chặn số và báo nhà mạng hoặc công an.
+
+Đoạn kết (1 câu):
+"Nếu lỡ chuyển tiền, gọi ngay ngân hàng để xin khóa giao dịch và trình báo công an."
+
+TUYỆT ĐỐI BẮT BUỘC:
+- KHÔNG dùng bất kỳ emoji nào (không ❌, 🔍, 💡, 🚫, 🧘, 🏥, 🛑).
+- KHÔNG viết hoa nguyên câu (ALL CAPS).
+- Mỗi gạch đầu dòng chỉ từ 1 câu ngắn, không giải thích dông dài.`;
       }
 
       const result = await model.generateContent([promptText, imagePart]);
@@ -353,30 +405,42 @@ NHIỆM VỤ CỦA BẠN:
       // Dọn dẹp markdown code block
       responseText = responseText.replace(/^```(?:json|markdown)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
 
-      // Xác định status từ câu trả lời
+      // Xác định status từ câu trả lời một cách tự nhiên
       const lower = responseText.toLowerCase();
       let status = 'info';
-      if (lower.startsWith('❌') || lower.includes('[nguy hiểm]') || lower.includes('nguy hiểm') || lower.includes('lừa đảo')) {
+      if (
+        lower.includes('lừa đảo') ||
+        lower.includes('nguy hiểm') ||
+        lower.includes('giả mạo') ||
+        lower.includes('đừng chuyển tiền') ||
+        lower.includes('không chuyển tiền') ||
+        lower.includes('mã độc')
+      ) {
         status = 'danger';
-      } else if (lower.startsWith('⚠️') || lower.includes('[cảnh báo]') || lower.includes('cảnh báo') || lower.includes('đáng ngờ')) {
+      } else if (
+        lower.includes('cảnh báo') ||
+        lower.includes('đáng ngờ') ||
+        lower.includes('cảnh giác') ||
+        lower.includes('thận trọng')
+      ) {
         status = 'warning';
-      } else if (lower.startsWith('✅') || lower.includes('[an toàn]') || lower.includes('an toàn')) {
+      } else if (
+        lower.includes('an toàn') ||
+        lower.includes('chính thức') ||
+        lower.includes('hợp lệ')
+      ) {
         status = 'safe';
       }
 
-      // Nếu có mã QR, thêm thông tin bóc tách nổi bật lên đầu tin nhắn
+      // Nếu có mã QR, thêm thông tin bóc tách ngắn gọn lên đầu
       if (qrResult.found) {
-        responseText = `🔍 **Phát hiện mã QR trong ảnh: [ \`${qrResult.data}\` ]**\n\n` + responseText;
+        responseText = `Mã QR trong ảnh dẫn tới: \`${qrResult.data}\`\n\n` + responseText;
       }
-
-      const recs = qrAnalysis && qrAnalysis.recommendations && qrAnalysis.recommendations.length > 0
-        ? qrAnalysis.recommendations
-        : ['Luôn xác minh danh tính người gửi qua kênh chính thức', 'Không cung cấp mã OTP hoặc mật khẩu'];
 
       return {
         text: responseText,
         status,
-        recommendations: recs
+        recommendations: [] // Để rỗng vì các hành động cụ thể đã được AI trình bày rõ ràng trong "Bạn nên làm gì:"
       };
     } catch (aiErr) {
       console.error('Lỗi khi gọi Gemini Vision:', aiErr.message);

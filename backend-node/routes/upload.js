@@ -139,7 +139,9 @@ router.post('/', optionalAuth, upload.array('files', 5), async (req, res) => {
     // Tổng hợp kết quả
     const overallStatus = analyses.some(a => a.status === 'danger') ? 'danger' :
                           analyses.some(a => a.status === 'warning') ? 'warning' : 'safe';
-    const combinedText = analyses.map(a => `**${a.fileName}**:\n${a.text}`).join('\n\n---\n\n');
+    const combinedText = analyses.length === 1
+      ? analyses[0].text
+      : analyses.map(a => `**${a.fileName}**:\n${a.text}`).join('\n\n---\n\n');
     const allRecs = [...new Set(analyses.flatMap(a => a.recommendations || []))];
 
     // Chuẩn bị metadata file
